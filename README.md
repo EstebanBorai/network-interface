@@ -16,7 +16,7 @@
 
 </div>
 
-> This crate is under development, feel free to contribute on [GitHub](https://github.com/EstebanBorai/network-interface)
+> This crate is under development, feel free to contribute on [GitHub](https://github.com/EstebanBorai/network-interface). API and implementation is subject to change.
 
 The main goal of `network-interface` crate is to retrieve system's Network
 Interfaces in a standarized manner.
