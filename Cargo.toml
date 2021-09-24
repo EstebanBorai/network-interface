@@ -1,0 +1,29 @@
+[package]
+name = "network-interface"
+description = "Retrieve system's Network Interfaces on Linux, macOS and Windows on a standarized manner"
+repository = "https://github.com/EstebanBorai/network-interface"
+categories = ["web-programming", "network-programming"]
+homepage = "https://github.com/EstebanBorai/network-interface"
+keywords = ["network", "interfaces", "ip", "web", "network"]
+license = "MIT OR Apache-2.0"
+version = "0.1.0-beta"
+authors = ["Esteban Borai <estebanborai@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+thiserror = "1.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2.101"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2.101"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+libc = "0.2.101"
+windows = "0.20.0"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+windows = "0.20.0"
