@@ -2,12 +2,10 @@ use std::mem;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::slice::from_raw_parts;
 
-use libc::{
-    AF_INET, AF_INET6, getifaddrs, ifaddrs, in6_addr, in_addr, malloc, sockaddr_in, sockaddr_in6,
-    strlen,
-};
+use libc::{AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen};
 
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
+use crate::utils::{ipv4_from_in_addr, ipv6_from_in6_addr};
 
 /// `ifaddrs` struct raw pointer alias
 pub type NetIfaAddrPtr = *mut *mut ifaddrs;
@@ -60,8 +58,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let socket_addr = netifa_addr as *mut sockaddr_in;
                     let internet_address = unsafe { (*socket_addr).sin_addr };
                     let name = make_netifa_name(&netifa)?;
-                    let netmask = make_ipv4_netmask(&netifa)?;
-                    let addr = make_ipv4_addr(&internet_address)?;
+                    let netmask = make_ipv4_netmask(&netifa);
+                    let addr = ipv4_from_in_addr(&internet_address)?;
                     let broadcast = make_ipv4_broadcast_addr(&netifa)?;
                     let network_interface =
                         NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast);
@@ -74,8 +72,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let socket_addr = netifa_addr as *mut sockaddr_in6;
                     let internet_address = unsafe { (*socket_addr).sin6_addr };
                     let name = make_netifa_name(&netifa)?;
-                    let netmask = make_ipv6_netmask(&netifa)?;
-                    let addr = make_ipv6_addr(&internet_address)?;
+                    let netmask = make_ipv6_netmask(&netifa);
+                    let addr = ipv6_from_in6_addr(&internet_address)?;
                     let broadcast = make_ipv6_broadcast_addr(&netifa)?;
                     let network_interface =
                         NetworkInterface::new_afinet6(name.as_str(), addr, netmask, broadcast);
@@ -107,47 +105,39 @@ fn make_netifa_name(netifa: &NetIfaAddrPtr) -> Result<String> {
 
 /// Retrieves the Netmask from a `ifaddrs` instance for a network interface
 /// from the AF_INET (IPv4) family.
-fn make_ipv4_netmask(netifa: &NetIfaAddrPtr) -> Result<Ipv4Addr> {
+fn make_ipv4_netmask(netifa: &NetIfaAddrPtr) -> Option<Ipv4Addr> {
     let netifa = *netifa;
     let sockaddr = unsafe { (*(*netifa)).ifa_netmask };
+
+    if sockaddr.is_null() {
+        return None;
+    }
+
     let socket_addr = sockaddr as *mut sockaddr_in;
     let internet_address = unsafe { (*socket_addr).sin_addr };
 
-    make_ipv4_addr(&internet_address)
+    ipv4_from_in_addr(&internet_address).ok()
 }
 
 /// Retrieves the Netmask from a `ifaddrs` instance for a network interface
 /// from the AF_INET6 (IPv6) family.
-fn make_ipv6_netmask(netifa: &NetIfaAddrPtr) -> Result<Ipv6Addr> {
+fn make_ipv6_netmask(netifa: &NetIfaAddrPtr) -> Option<Ipv6Addr> {
     let netifa = *netifa;
     let sockaddr = unsafe { (*(*netifa)).ifa_netmask };
+
+    if sockaddr.is_null() {
+        return None;
+    }
+
     let socket_addr = sockaddr as *mut sockaddr_in6;
     let internet_address = unsafe { (*socket_addr).sin6_addr };
 
-    make_ipv6_addr(&internet_address)
-}
-
-/// Creates a `Ipv4Addr` from a `in_addr`
-fn make_ipv4_addr(internet_address: &in_addr) -> Result<Ipv4Addr> {
-    let mut ip_addr = Ipv4Addr::from(internet_address.s_addr);
-
-    if cfg!(target_endian = "little") {
-        // due to a difference on how bytes are arranged on a
-        // single word of memory by the CPU, swap bytes based
-        // on CPU endianess to avoid having twisted IP addresses
-        //
-        // refer: https://github.com/rust-lang/rust/issues/48819
-        ip_addr = Ipv4Addr::from(internet_address.s_addr.swap_bytes());
+    //  Ignore local addresses
+    if internet_address.s6_addr[0] == 0xfe && internet_address.s6_addr[1] == 0x80 {
+        return None;
     }
 
-    Ok(ip_addr)
-}
-
-/// Creates a `Ipv6Addr` from a `in6_addr`
-fn make_ipv6_addr(internet_address: &in6_addr) -> Result<Ipv6Addr> {
-    let ip_addr = Ipv6Addr::from(internet_address.s6_addr);
-
-    Ok(ip_addr)
+    ipv6_from_in6_addr(&internet_address).ok()
 }
 
 /// Retrieves the broadcast address for the network interface provided of the
@@ -166,7 +156,7 @@ fn make_ipv4_broadcast_addr(netifa: &NetIfaAddrPtr) -> Result<Option<Ipv4Addr>> 
 
     let socket_addr = ifa_dstaddr as *mut sockaddr_in;
     let internet_address = unsafe { (*socket_addr).sin_addr };
-    let addr = make_ipv4_addr(&internet_address)?;
+    let addr = ipv4_from_in_addr(&internet_address)?;
 
     Ok(Some(addr))
 }
@@ -187,7 +177,7 @@ fn make_ipv6_broadcast_addr(netifa: &NetIfaAddrPtr) -> Result<Option<Ipv6Addr>> 
 
     let socket_addr = ifa_dstaddr as *mut sockaddr_in6;
     let internet_address = unsafe { (*socket_addr).sin6_addr };
-    let addr = make_ipv6_addr(&internet_address)?;
+    let addr = ipv6_from_in6_addr(&internet_address)?;
 
     Ok(Some(addr))
 }

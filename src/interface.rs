@@ -1,3 +1,6 @@
+//! Network Interface abstraction from commonly used fields for nodes from the
+//! linked list provided by system functions like `getifaddrs` and
+//! `GetAdaptersAddresses`.
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 /// A system's network interface
@@ -26,7 +29,7 @@ pub struct V4IfAddr {
     /// The broadcast address for this interface
     pub broadcast: Option<Ipv4Addr>,
     /// The netmask for this interface
-    pub netmask: Ipv4Addr,
+    pub netmask: Option<Ipv4Addr>,
 }
 
 /// IPV6 Interface from the AFINET6 network interface family
@@ -37,14 +40,14 @@ pub struct V6IfAddr {
     /// The broadcast address for this interface
     pub broadcast: Option<Ipv6Addr>,
     /// The netmask for this interface
-    pub netmask: Ipv6Addr,
+    pub netmask: Option<Ipv6Addr>,
 }
 
 impl NetworkInterface {
     pub fn new_afinet(
         name: &str,
         addr: Ipv4Addr,
-        netmask: Ipv4Addr,
+        netmask: Option<Ipv4Addr>,
         broadcast: Option<Ipv4Addr>,
     ) -> NetworkInterface {
         let ifaddr_v4 = V4IfAddr {
@@ -62,7 +65,7 @@ impl NetworkInterface {
     pub fn new_afinet6(
         name: &str,
         addr: Ipv6Addr,
-        netmask: Ipv6Addr,
+        netmask: Option<Ipv6Addr>,
         broadcast: Option<Ipv6Addr>,
     ) -> NetworkInterface {
         let ifaddr_v6 = V6IfAddr {
