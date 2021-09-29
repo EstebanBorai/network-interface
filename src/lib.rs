@@ -1,6 +1,8 @@
 mod error;
 mod interface;
 mod target;
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 mod utils;
 
 pub use error::*;

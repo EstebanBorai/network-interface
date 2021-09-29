@@ -1,10 +1,15 @@
 //! Network Interface abstraction from commonly used fields for nodes from the
 //! linked list provided by system functions like `getifaddrs` and
 //! `GetAdaptersAddresses`.
+use std::fmt::Debug;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+/// An alias for an `Option` that wraps either a `Ipv4Addr` or a `Ipv6Addr`
+/// representing the IP for a Network Interface netmask
+pub type Netmask<T> = Option<T>;
+
 /// A system's network interface
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NetworkInterface {
     /// Interface's name
     pub name: String,
@@ -13,7 +18,7 @@ pub struct NetworkInterface {
 }
 
 /// Network interface address
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Addr {
     /// IPV4 Interface from the AFINET network interface family
     V4(V4IfAddr),
@@ -22,32 +27,32 @@ pub enum Addr {
 }
 
 /// IPV4 Interface from the AFINET network interface family
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct V4IfAddr {
     /// The IP address for this network interface
     pub ip: Ipv4Addr,
     /// The broadcast address for this interface
     pub broadcast: Option<Ipv4Addr>,
     /// The netmask for this interface
-    pub netmask: Option<Ipv4Addr>,
+    pub netmask: Netmask<Ipv4Addr>,
 }
 
 /// IPV6 Interface from the AFINET6 network interface family
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct V6IfAddr {
     /// The IP address for this network interface
     pub ip: Ipv6Addr,
     /// The broadcast address for this interface
     pub broadcast: Option<Ipv6Addr>,
     /// The netmask for this interface
-    pub netmask: Option<Ipv6Addr>,
+    pub netmask: Netmask<Ipv6Addr>,
 }
 
 impl NetworkInterface {
     pub fn new_afinet(
         name: &str,
         addr: Ipv4Addr,
-        netmask: Option<Ipv4Addr>,
+        netmask: Netmask<Ipv4Addr>,
         broadcast: Option<Ipv4Addr>,
     ) -> NetworkInterface {
         let ifaddr_v4 = V4IfAddr {
@@ -65,7 +70,7 @@ impl NetworkInterface {
     pub fn new_afinet6(
         name: &str,
         addr: Ipv6Addr,
-        netmask: Option<Ipv6Addr>,
+        netmask: Netmask<Ipv6Addr>,
         broadcast: Option<Ipv6Addr>,
     ) -> NetworkInterface {
         let ifaddr_v6 = V6IfAddr {
