@@ -3,17 +3,20 @@ mod bindings {
 }
 
 use std::ffi::c_void;
+use std::mem::size_of;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::ptr::null_mut;
 use std::slice::from_raw_parts;
 use libc::{free, malloc, wchar_t, wcslen};
 
+use crate::interface::Netmask;
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
 
 use self::bindings::Windows::Win32;
 use self::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
 use self::Win32::NetworkManagement::IpHelper::{
-    ADDRESS_FAMILY, AF_UNSPEC, IP_ADAPTER_ADDRESSES_LH, GetAdaptersAddresses,
+    ADDRESS_FAMILY, AF_UNSPEC, IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_UNICAST_ADDRESS_LH,
+    ConvertLengthToIpv4Mask, GetAdaptersAddresses,
 };
 
 /// An alias for `IP_ADAPTER_ADDRESSES_LH`
@@ -108,16 +111,18 @@ impl NetworkInterfaceConfig for NetworkInterface {
                         AF_INET => {
                             let sockaddr = address.lpSockaddr as *mut SOCKADDR_IN;
                             let addr = make_ipv4_addr(&sockaddr)?;
+                            let netmask = make_ipv4_netmask(&current_unicast_address);
                             let network_interface =
-                                NetworkInterface::new_afinet(&address_name, addr, addr, None);
+                                NetworkInterface::new_afinet(&address_name, addr, netmask, None);
 
                             network_interfaces.push(network_interface);
                         }
                         AF_INET6 => {
                             let sockaddr = address.lpSockaddr as *mut SOCKADDR_IN6;
                             let addr = make_ipv6_addr(&sockaddr)?;
+                            let netmask = make_ipv6_netmask(&sockaddr);
                             let network_interface =
-                                NetworkInterface::new_afinet6(&address_name, addr, addr, None);
+                                NetworkInterface::new_afinet6(&address_name, addr, netmask, None);
 
                             network_interfaces.push(network_interface);
                         }
@@ -173,6 +178,38 @@ fn make_ipv4_addr(sockaddr: &*mut SOCKADDR_IN) -> Result<Ipv4Addr> {
     Ok(Ipv4Addr::from(address))
 }
 
+/// This function relies on the `GetAdapterAddresses` API which is available only on Windows Vista
+/// and later versions.
+///
+/// An implementation of `GetIpAddrTable` to get all available network interfaces would be required
+/// in order to support previous versions of Windows.
+fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Netmask<Ipv4Addr> {
+    let mask = unsafe { malloc(size_of::<u32>()) as *mut u32 };
+    let on_link_prefix_length = unsafe { (*(*unicast_address)).OnLinkPrefixLength };
+
+    match unsafe { ConvertLengthToIpv4Mask(on_link_prefix_length as u32, mask) } {
+        Ok(_) => {
+            let mask = unsafe { *mask };
+
+            if cfg!(target_endian = "little") {
+                // due to a difference on how bytes are arranged on a
+                // single word of memory by the CPU, swap bytes based
+                // on CPU endianess to avoid having twisted IP addresses
+                //
+                // refer: https://github.com/rust-lang/rust/issues/48819
+                return Some(Ipv4Addr::from(mask.swap_bytes()));
+            }
+
+            Some(Ipv4Addr::from(mask))
+        }
+        Err(_) => None,
+    }
+}
+
+fn make_ipv6_netmask(_sockaddr: &*mut SOCKADDR_IN6) -> Netmask<Ipv6Addr> {
+    None
+}
+
 #[cfg(target_os = "windows")]
 mod tests {
     #[test]
@@ -181,6 +218,8 @@ mod tests {
 
         let network_interfaces = NetworkInterface::show().unwrap();
 
-        assert!(network_interfaces.len() > 1);
+        println!("{:#?}", network_interfaces);
+
+        assert!(network_interfaces.len() > 100);
     }
 }
