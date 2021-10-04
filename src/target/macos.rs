@@ -5,10 +5,9 @@ use std::slice::from_raw_parts;
 use libc::{AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen};
 
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
-use crate::utils::{ipv4_from_in_addr, ipv6_from_in6_addr};
-
-/// `ifaddrs` struct raw pointer alias
-pub type NetIfaAddrPtr = *mut *mut ifaddrs;
+use crate::utils::{
+    NetIfaAddrPtr, ipv4_from_in_addr, ipv6_from_in6_addr, make_ipv4_netmask, make_ipv6_netmask,
+};
 
 impl NetworkInterfaceConfig for NetworkInterface {
     fn show() -> Result<Vec<NetworkInterface>> {
@@ -101,43 +100,6 @@ fn make_netifa_name(netifa: &NetIfaAddrPtr) -> Result<String> {
     let string = String::from_utf8(bytes_slice.to_vec()).map_err(Error::from)?;
 
     Ok(string)
-}
-
-/// Retrieves the Netmask from a `ifaddrs` instance for a network interface
-/// from the AF_INET (IPv4) family.
-fn make_ipv4_netmask(netifa: &NetIfaAddrPtr) -> Option<Ipv4Addr> {
-    let netifa = *netifa;
-    let sockaddr = unsafe { (*(*netifa)).ifa_netmask };
-
-    if sockaddr.is_null() {
-        return None;
-    }
-
-    let socket_addr = sockaddr as *mut sockaddr_in;
-    let internet_address = unsafe { (*socket_addr).sin_addr };
-
-    ipv4_from_in_addr(&internet_address).ok()
-}
-
-/// Retrieves the Netmask from a `ifaddrs` instance for a network interface
-/// from the AF_INET6 (IPv6) family.
-fn make_ipv6_netmask(netifa: &NetIfaAddrPtr) -> Option<Ipv6Addr> {
-    let netifa = *netifa;
-    let sockaddr = unsafe { (*(*netifa)).ifa_netmask };
-
-    if sockaddr.is_null() {
-        return None;
-    }
-
-    let socket_addr = sockaddr as *mut sockaddr_in6;
-    let internet_address = unsafe { (*socket_addr).sin6_addr };
-
-    //  Ignore local addresses
-    if internet_address.s6_addr[0] == 0xfe && internet_address.s6_addr[1] == 0x80 {
-        return None;
-    }
-
-    ipv6_from_in6_addr(&internet_address).ok()
 }
 
 /// Retrieves the broadcast address for the network interface provided of the
