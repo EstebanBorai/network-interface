@@ -98,10 +98,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
         }
 
         if get_adapter_addresses_result == GET_ADAPTERS_ADDRESSES_SUCCESS_RESULT {
-            let mut current_adapter_address = adapter_address;
-
-            while !current_adapter_address.is_null() {
-                let address_name = make_adapter_address_name(&current_adapter_address)?;
+            while !adapter_address.is_null() {
+                let address_name = make_adapter_address_name(&adapter_address)?;
                 let mut current_unicast_address = unsafe { (*adapter_address).FirstUnicastAddress };
 
                 while !current_unicast_address.is_null() {
@@ -109,7 +107,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
 
                     match unsafe { (*address.lpSockaddr).sa_family } {
                         AF_INET => {
-                            let sockaddr = address.lpSockaddr as *mut SOCKADDR_IN;
+                            let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
                             let addr = make_ipv4_addr(&sockaddr)?;
                             let netmask = make_ipv4_netmask(&current_unicast_address);
                             let network_interface =
@@ -118,7 +116,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
                             network_interfaces.push(network_interface);
                         }
                         AF_INET6 => {
-                            let sockaddr = address.lpSockaddr as *mut SOCKADDR_IN6;
+                            let sockaddr: *mut SOCKADDR_IN6 =
+                                address.lpSockaddr as *mut SOCKADDR_IN6;
                             let addr = make_ipv6_addr(&sockaddr)?;
                             let netmask = make_ipv6_netmask(&sockaddr);
                             let network_interface =
@@ -130,12 +129,14 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     }
 
                     if !current_unicast_address.is_null() {
+                        println!("BEFORE: {:#?}", current_unicast_address);
                         current_unicast_address = unsafe { (*current_unicast_address).Next };
+                        println!("AFTER: {:#?}", current_unicast_address);
                     }
                 }
 
-                if !current_adapter_address.is_null() {
-                    current_adapter_address = unsafe { (*current_adapter_address).Next };
+                if !adapter_address.is_null() {
+                    adapter_address = unsafe { (*adapter_address).Next };
                 }
             }
         }
@@ -218,8 +219,6 @@ mod tests {
 
         let network_interfaces = NetworkInterface::show().unwrap();
 
-        println!("{:#?}", network_interfaces);
-
-        assert!(network_interfaces.len() > 100);
+        assert!(network_interfaces.len() > 1);
     }
 }
