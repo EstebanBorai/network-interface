@@ -6,12 +6,11 @@ mod target;
 mod utils;
 
 pub use error::*;
-
-use self::interface::NetworkInterface;
+pub use interface::*;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
 pub trait NetworkInterfaceConfig {
     /// List system's network interfaces configuration
-    fn show() -> Result<Vec<NetworkInterface>>;
+    fn show() -> Result<Vec<interface::NetworkInterface>>;
 }
