@@ -129,9 +129,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     }
 
                     if !current_unicast_address.is_null() {
-                        println!("BEFORE: {:#?}", current_unicast_address);
                         current_unicast_address = unsafe { (*current_unicast_address).Next };
-                        println!("AFTER: {:#?}", current_unicast_address);
                     }
                 }
 
