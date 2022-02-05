@@ -52,10 +52,12 @@ impl NetworkInterfaceConfig for NetworkInterface {
         while has_next(netifa) {
             let netifa_addr = unsafe { (**netifa).ifa_addr };
 
-            let netifa_family = unsafe { (*netifa_addr).sa_family as i32 };
+            let netifa_family =
+                if netifa_addr.is_null() { None }
+                else { Some(unsafe { (*netifa_addr).sa_family as i32 }) };
 
             match netifa_family {
-                AF_INET => {
+                Some(AF_INET) => {
                     let netifa_addr = netifa_addr;
                     let socket_addr = netifa_addr as *mut sockaddr_in;
                     let internet_address = unsafe { (*socket_addr).sin_addr };
@@ -67,9 +69,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
                         NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast);
 
                     advance(Some(network_interface));
-                    continue;
                 }
-                AF_INET6 => {
+                Some(AF_INET6) => {
                     let netifa_addr = netifa_addr;
                     let socket_addr = netifa_addr as *mut sockaddr_in6;
                     let internet_address = unsafe { (*socket_addr).sin6_addr };
@@ -81,11 +82,9 @@ impl NetworkInterfaceConfig for NetworkInterface {
                         NetworkInterface::new_afinet6(name.as_str(), addr, netmask, broadcast);
 
                     advance(Some(network_interface));
-                    continue;
                 }
                 _ => {
                     advance(None);
-                    continue;
                 }
             }
         }
