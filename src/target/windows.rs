@@ -53,7 +53,7 @@ const AF_INET6: u16 = self::Win32::NetworkManagement::IpHelper::AF_INET6.0 as u1
 const GET_ADAPTERS_ADDRESSES_FAMILY: ADDRESS_FAMILY = ADDRESS_FAMILY(AF_UNSPEC.0);
 
 const GET_ADAPTERS_ADDRESSES_FLAGS: GetAdaptersAddressesFlags =
-    self::Win32::NetworkManagement::IpHelper::GET_ADAPTERS_ADDRESSES_FLAGS(0x0);
+    self::Win32::NetworkManagement::IpHelper::GAA_FLAG_INCLUDE_PREFIX;
 
 impl NetworkInterfaceConfig for NetworkInterface {
     fn show() -> Result<Vec<NetworkInterface>> {
@@ -100,6 +100,40 @@ impl NetworkInterfaceConfig for NetworkInterface {
         if get_adapter_addresses_result == GET_ADAPTERS_ADDRESSES_SUCCESS_RESULT {
             while !adapter_address.is_null() {
                 let address_name = make_adapter_address_name(&adapter_address)?;
+
+                // Find broadcast address
+                //
+                // see https://docs.microsoft.com/en-us/windows/win32/api/iptypes/ns-iptypes-ip_adapter_addresses_lh
+                //
+                // On Windows Vista and later, the linked IP_ADAPTER_PREFIX structures pointed to by the FirstPrefix
+                // member include three IP adapter prefixes for each IP address assigned to the adapter. These include
+                // 0. the host IP address prefix
+                // 1. the subnet IP address prefix
+                // 2. and the subnet broadcast IP address prefix. << we want this
+                // In addition, for each adapter there is a
+                // 3. multicast address prefix
+                // 4. and a broadcast address prefix.sb
+                //
+                // We only care for AF_INET entry with index 2.
+                let mut current_prefix_address = unsafe { (*adapter_address).FirstPrefix };
+                let mut prefix_index_ipv4 = 0;
+                let mut bc_addr_ipv4 = None;
+                while !current_prefix_address.is_null() {
+                    let address = unsafe { (*current_prefix_address).Address };
+                    if unsafe { (*address.lpSockaddr).sa_family } == AF_INET {
+                        // only consider broadcast for IPv4
+                        if prefix_index_ipv4 == 2 {
+                            // 3rd IPv4 entry is broadcast address
+                            let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
+                            bc_addr_ipv4 = Some(make_ipv4_addr(&sockaddr)?);
+                            break;
+                        }
+                        prefix_index_ipv4 += 1; // only increase for AF_INET
+                    }
+                    current_prefix_address = unsafe { (*current_prefix_address).Next };
+                }
+
+                // Find interface addresses
                 let mut current_unicast_address = unsafe { (*adapter_address).FirstUnicastAddress };
 
                 while !current_unicast_address.is_null() {
@@ -110,8 +144,12 @@ impl NetworkInterfaceConfig for NetworkInterface {
                             let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
                             let addr = make_ipv4_addr(&sockaddr)?;
                             let netmask = make_ipv4_netmask(&current_unicast_address);
-                            let network_interface =
-                                NetworkInterface::new_afinet(&address_name, addr, netmask, None);
+                            let network_interface = NetworkInterface::new_afinet(
+                                &address_name,
+                                addr,
+                                netmask,
+                                bc_addr_ipv4,
+                            );
 
                             network_interfaces.push(network_interface);
                         }
