@@ -52,9 +52,11 @@ impl NetworkInterfaceConfig for NetworkInterface {
         while has_next(netifa) {
             let netifa_addr = unsafe { (**netifa).ifa_addr };
 
-            let netifa_family =
-                if netifa_addr.is_null() { None }
-                else { Some(unsafe { (*netifa_addr).sa_family as i32 }) };
+            let netifa_family = if netifa_addr.is_null() {
+                None
+            } else {
+                Some(unsafe { (*netifa_addr).sa_family as i32 })
+            };
 
             match netifa_family {
                 Some(AF_INET) => {
