@@ -27,12 +27,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
         let mut network_interfaces: Vec<NetworkInterface> = Vec::new();
         let netifa = addr;
 
-        let has_next = |netifa: *mut *mut ifaddrs| {
+        let has_current = |netifa: *mut *mut ifaddrs| {
             if unsafe { (*netifa).is_null() } {
-                return false;
-            }
-
-            if unsafe { (**netifa).ifa_next.is_null() } {
                 return false;
             }
 
@@ -47,7 +43,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
             unsafe { *netifa = (**netifa).ifa_next };
         };
 
-        while has_next(netifa) {
+        while has_current(netifa) {
             let netifa_addr = unsafe { (**netifa).ifa_addr };
             let netifa_family = unsafe { (*netifa_addr).sa_family as i32 };
 
