@@ -7,8 +7,8 @@ use std::slice::from_raw_parts;
 use libc::{free, malloc, wchar_t, wcslen};
 use windows::Win32::Networking::WinSock::{ADDRESS_FAMILY, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6};
 use windows::Win32::NetworkManagement::IpHelper::{
-    ConvertLengthToIpv4Mask, GetAdaptersAddresses,
-    IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_UNICAST_ADDRESS_LH,
+    ConvertLengthToIpv4Mask, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH,
+    IP_ADAPTER_UNICAST_ADDRESS_LH,
 };
 
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
