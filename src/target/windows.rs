@@ -1,30 +1,25 @@
-mod bindings {
-    windows::include_bindings!();
-}
-
 use std::ffi::c_void;
 use std::mem::size_of;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::ptr::null_mut;
 use std::slice::from_raw_parts;
+
 use libc::{free, malloc, wchar_t, wcslen};
-
-use crate::interface::Netmask;
-use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
-
-use self::bindings::Windows::Win32;
-use self::Win32::Networking::WinSock::{SOCKADDR_IN, SOCKADDR_IN6};
-use self::Win32::NetworkManagement::IpHelper::{
-    ADDRESS_FAMILY, AF_UNSPEC, IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_UNICAST_ADDRESS_LH,
-    ConvertLengthToIpv4Mask, GetAdaptersAddresses,
+use windows::Win32::Networking::WinSock::{ADDRESS_FAMILY, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6};
+use windows::Win32::NetworkManagement::IpHelper::{
+    ConvertLengthToIpv4Mask, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH,
+    IP_ADAPTER_UNICAST_ADDRESS_LH,
 };
+
+use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
+use crate::interface::Netmask;
 
 /// An alias for `IP_ADAPTER_ADDRESSES_LH`
 type AdapterAddress = IP_ADAPTER_ADDRESSES_LH;
 
 /// An alias for `GET_ADAPTERS_ADDRESSES_FLAGS`
 type GetAdaptersAddressesFlags =
-    self::Win32::NetworkManagement::IpHelper::GET_ADAPTERS_ADDRESSES_FLAGS;
+    windows::Win32::NetworkManagement::IpHelper::GET_ADAPTERS_ADDRESSES_FLAGS;
 
 /// The buffer size indicated by the `SizePointer` parameter is too small to hold the
 /// adapter information or the `AdapterAddresses` parameter is `NULL`. The `SizePointer`
@@ -41,10 +36,10 @@ const MAX_TRIES: usize = 3;
 const GET_ADAPTERS_ADDRESSES_SUCCESS_RESULT: u32 = 0;
 
 /// A constant to store `Win32::NetworkManagement::IpHelper::AF_INET.0` casted as `u16`
-const AF_INET: u16 = self::Win32::NetworkManagement::IpHelper::AF_INET.0 as u16;
+const AF_INET: u16 = windows::Win32::Networking::WinSock::AF_INET.0 as u16;
 
 /// A constant to store `Win32::NetworkManagement::IpHelper::AF_INET6.0` casted as `u16`
-const AF_INET6: u16 = self::Win32::NetworkManagement::IpHelper::AF_INET6.0 as u16;
+const AF_INET6: u16 = windows::Win32::Networking::WinSock::AF_INET6.0 as u16;
 
 /// The address family of the addresses to retrieve. This parameter must be one of the following values.
 /// The default address family is `AF_UNSPECT` in order to gather both IPv4 and IPv6 network interfaces.
@@ -53,7 +48,7 @@ const AF_INET6: u16 = self::Win32::NetworkManagement::IpHelper::AF_INET6.0 as u1
 const GET_ADAPTERS_ADDRESSES_FAMILY: ADDRESS_FAMILY = ADDRESS_FAMILY(AF_UNSPEC.0);
 
 const GET_ADAPTERS_ADDRESSES_FLAGS: GetAdaptersAddressesFlags =
-    self::Win32::NetworkManagement::IpHelper::GAA_FLAG_INCLUDE_PREFIX;
+    windows::Win32::NetworkManagement::IpHelper::GAA_FLAG_INCLUDE_PREFIX;
 
 impl NetworkInterfaceConfig for NetworkInterface {
     fn show() -> Result<Vec<NetworkInterface>> {
