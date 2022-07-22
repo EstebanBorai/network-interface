@@ -1,5 +1,6 @@
 mod error;
 mod interface;
+mod mac;
 mod target;
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

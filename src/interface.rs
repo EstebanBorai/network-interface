@@ -4,12 +4,11 @@
 use std::fmt::Debug;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use crate::mac::MacAddress;
+
 /// An alias for an `Option` that wraps either a `Ipv4Addr` or a `Ipv6Addr`
 /// representing the IP for a Network Interface netmask
 pub type Netmask<T> = Option<T>;
-
-/// An alias for a boxed array of bytes used to represent a MAC Address
-pub type MacAddress = Box<[u8; 6]>;
 
 /// A system's network interface
 #[derive(Debug, Clone)]

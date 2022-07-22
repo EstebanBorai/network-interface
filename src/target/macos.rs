@@ -4,13 +4,18 @@ use std::slice::from_raw_parts;
 
 use libc::{
     AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen, AF_LINK,
-    sockaddr_dl, sockaddr,
+    sockaddr_dl,
 };
 
-use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result, MacAddress};
+use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
+use crate::mac::MacAddress;
 use crate::utils::{
     NetIfaAddrPtr, ipv4_from_in_addr, ipv6_from_in6_addr, make_ipv4_netmask, make_ipv6_netmask,
 };
+
+fn lladdr(s: *mut sockaddr_dl) {
+    // unsafe { (*s).sdl_data + (*s).sdl_len }
+}
 
 impl NetworkInterfaceConfig for NetworkInterface {
     fn show() -> Result<Vec<NetworkInterface>> {
@@ -54,27 +59,30 @@ impl NetworkInterfaceConfig for NetworkInterface {
                 AF_LINK => {
                     let netifa_addr = netifa_addr;
                     let sockaddr_dl = netifa_addr as *mut sockaddr_dl;
-                    let mac = unsafe { (*sockaddr_dl).sdl_len };
+                    let name = make_netifa_name(&netifa)?;
+                    let mac_len = unsafe { (*sockaddr_dl).sdl_len };
 
-                    if mac == 6 {
+                    if mac_len == 6 {
                         let parts = unsafe { (*sockaddr_dl).sdl_data };
-                        let mac_addr: &[i8; 6] =
-                            &[parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]];
+                        let parts = unsafe { std::mem::transmute::<[i8; 12], [u8; 12]>(parts) };
+
+                        MacAddress::new_v6(
+                            parts[0], parts[1], parts[2], parts[3], parts[4], parts[5],
+                        );
 
                         println!(
-                            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-                            parts[0], parts[1], parts[2], parts[3], parts[4], parts[5],
+                            "v6 {} {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                            name, parts[0], parts[1], parts[2], parts[3], parts[4], parts[5],
                         );
                     }
 
-                    if mac > 6 {
+                    if mac_len > 6 {
                         let parts = unsafe { (*sockaddr_dl).sdl_data };
-                        let mac_addr: &[i8; 6] =
-                            &[parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]];
+                        let parts = unsafe { std::mem::transmute::<[i8; 12], [u8; 12]>(parts) };
 
                         println!(
-                            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-                            parts[1], parts[2], parts[3], parts[4], parts[5], parts[6],
+                            "v8 {} {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                            name, parts[1], parts[2], parts[3], parts[4], parts[5], parts[6],
                         );
                     }
                     advance(None);
