@@ -144,6 +144,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
                                 addr,
                                 netmask,
                                 bc_addr_ipv4,
+                                None,
                             );
 
                             network_interfaces.push(network_interface);
@@ -153,8 +154,13 @@ impl NetworkInterfaceConfig for NetworkInterface {
                                 address.lpSockaddr as *mut SOCKADDR_IN6;
                             let addr = make_ipv6_addr(&sockaddr)?;
                             let netmask = make_ipv6_netmask(&sockaddr);
-                            let network_interface =
-                                NetworkInterface::new_afinet6(&address_name, addr, netmask, None);
+                            let network_interface = NetworkInterface::new_afinet6(
+                                &address_name,
+                                addr,
+                                netmask,
+                                None,
+                                None,
+                            );
 
                             network_interfaces.push(network_interface);
                         }

@@ -2,9 +2,12 @@ use std::mem;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::slice::from_raw_parts;
 
-use libc::{AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen};
+use libc::{
+    AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen, AF_LINK,
+    sockaddr_dl, sockaddr,
+};
 
-use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
+use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result, MacAddress};
 use crate::utils::{
     NetIfaAddrPtr, ipv4_from_in_addr, ipv6_from_in6_addr, make_ipv4_netmask, make_ipv6_netmask,
 };
@@ -48,6 +51,34 @@ impl NetworkInterfaceConfig for NetworkInterface {
             let netifa_family = unsafe { (*netifa_addr).sa_family as i32 };
 
             match netifa_family {
+                AF_LINK => {
+                    let netifa_addr = netifa_addr;
+                    let sockaddr_dl = netifa_addr as *mut sockaddr_dl;
+                    let mac = unsafe { (*sockaddr_dl).sdl_len };
+
+                    if mac == 6 {
+                        let parts = unsafe { (*sockaddr_dl).sdl_data };
+                        let mac_addr: &[i8; 6] =
+                            &[parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]];
+
+                        println!(
+                            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                            parts[0], parts[1], parts[2], parts[3], parts[4], parts[5],
+                        );
+                    }
+
+                    if mac > 6 {
+                        let parts = unsafe { (*sockaddr_dl).sdl_data };
+                        let mac_addr: &[i8; 6] =
+                            &[parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]];
+
+                        println!(
+                            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                            parts[1], parts[2], parts[3], parts[4], parts[5], parts[6],
+                        );
+                    }
+                    advance(None);
+                }
                 AF_INET => {
                     let netifa_addr = netifa_addr;
                     let socket_addr = netifa_addr as *mut sockaddr_in;
@@ -57,7 +88,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let addr = ipv4_from_in_addr(&internet_address)?;
                     let broadcast = make_ipv4_broadcast_addr(&netifa)?;
                     let network_interface =
-                        NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast);
+                        NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast, None);
 
                     advance(Some(network_interface));
                     continue;
@@ -70,8 +101,13 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let netmask = make_ipv6_netmask(&netifa);
                     let addr = ipv6_from_in6_addr(&internet_address)?;
                     let broadcast = make_ipv6_broadcast_addr(&netifa)?;
-                    let network_interface =
-                        NetworkInterface::new_afinet6(name.as_str(), addr, netmask, broadcast);
+                    let network_interface = NetworkInterface::new_afinet6(
+                        name.as_str(),
+                        addr,
+                        netmask,
+                        broadcast,
+                        None,
+                    );
 
                     advance(Some(network_interface));
                     continue;

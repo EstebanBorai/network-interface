@@ -8,6 +8,9 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 /// representing the IP for a Network Interface netmask
 pub type Netmask<T> = Option<T>;
 
+/// An alias for a boxed array of bytes used to represent a MAC Address
+pub type MacAddress = Box<[u8; 6]>;
+
 /// A system's network interface
 #[derive(Debug, Clone)]
 pub struct NetworkInterface {
@@ -15,6 +18,8 @@ pub struct NetworkInterface {
     pub name: String,
     /// Interface's address
     pub addr: Option<Addr>,
+    /// MAC Address
+    pub mac_addr: Option<MacAddress>,
 }
 
 /// Network interface address
@@ -54,6 +59,7 @@ impl NetworkInterface {
         addr: Ipv4Addr,
         netmask: Netmask<Ipv4Addr>,
         broadcast: Option<Ipv4Addr>,
+        mac_addr: Option<MacAddress>,
     ) -> NetworkInterface {
         let ifaddr_v4 = V4IfAddr {
             ip: addr,
@@ -64,6 +70,7 @@ impl NetworkInterface {
         NetworkInterface {
             name: name.to_string(),
             addr: Some(Addr::V4(ifaddr_v4)),
+            mac_addr,
         }
     }
 
@@ -72,6 +79,7 @@ impl NetworkInterface {
         addr: Ipv6Addr,
         netmask: Netmask<Ipv6Addr>,
         broadcast: Option<Ipv6Addr>,
+        mac_addr: Option<MacAddress>,
     ) -> NetworkInterface {
         let ifaddr_v6 = V6IfAddr {
             ip: addr,
@@ -82,6 +90,7 @@ impl NetworkInterface {
         NetworkInterface {
             name: name.to_string(),
             addr: Some(Addr::V6(ifaddr_v6)),
+            mac_addr,
         }
     }
 }

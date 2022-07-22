@@ -64,7 +64,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let addr = ipv4_from_in_addr(&internet_address)?;
                     let broadcast = make_ipv4_broadcast_addr(&netifa)?;
                     let network_interface =
-                        NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast);
+                        NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast, None);
 
                     advance(Some(network_interface));
                 }
@@ -76,8 +76,13 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let netmask: Netmask<Ipv6Addr> = make_ipv6_netmask(&netifa);
                     let addr = ipv6_from_in6_addr(&internet_address)?;
                     let broadcast = make_ipv6_broadcast_addr(&netifa)?;
-                    let network_interface =
-                        NetworkInterface::new_afinet6(name.as_str(), addr, netmask, broadcast);
+                    let network_interface = NetworkInterface::new_afinet6(
+                        name.as_str(),
+                        addr,
+                        netmask,
+                        broadcast,
+                        None,
+                    );
 
                     advance(Some(network_interface));
                 }
