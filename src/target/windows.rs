@@ -5,10 +5,17 @@ use std::ptr::null_mut;
 use std::slice::from_raw_parts;
 
 use libc::{free, malloc, wchar_t, wcslen};
-use windows::Win32::Networking::WinSock::{ADDRESS_FAMILY, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6};
-use windows::Win32::NetworkManagement::IpHelper::{
-    ConvertLengthToIpv4Mask, GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH,
-    IP_ADAPTER_UNICAST_ADDRESS_LH,
+use winapi::{
+    shared::{
+        ws2def::{AF_UNSPEC, SOCKADDR_IN},
+        ws2ipdef::SOCKADDR_IN6,
+        netioapi::ConvertLengthToIpv4Mask,
+        ntdef::ULONG,
+    },
+    um::{
+        iptypes::{IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_UNICAST_ADDRESS_LH},
+        iphlpapi::GetAdaptersAddresses,
+    },
 };
 
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
@@ -16,10 +23,6 @@ use crate::interface::Netmask;
 
 /// An alias for `IP_ADAPTER_ADDRESSES_LH`
 type AdapterAddress = IP_ADAPTER_ADDRESSES_LH;
-
-/// An alias for `GET_ADAPTERS_ADDRESSES_FLAGS`
-type GetAdaptersAddressesFlags =
-    windows::Win32::NetworkManagement::IpHelper::GET_ADAPTERS_ADDRESSES_FLAGS;
 
 /// The buffer size indicated by the `SizePointer` parameter is too small to hold the
 /// adapter information or the `AdapterAddresses` parameter is `NULL`. The `SizePointer`
@@ -35,20 +38,20 @@ const MAX_TRIES: usize = 3;
 /// Success execution output from `GetAdaptersAddresses` call
 const GET_ADAPTERS_ADDRESSES_SUCCESS_RESULT: u32 = 0;
 
-/// A constant to store `Win32::NetworkManagement::IpHelper::AF_INET.0` casted as `u16`
-const AF_INET: u16 = windows::Win32::Networking::WinSock::AF_INET.0 as u16;
+/// A constant to store `winapi::shared::ws2def::AF_INET` casted as `u16`
+const AF_INET: u16 = winapi::shared::ws2def::AF_INET as u16;
 
-/// A constant to store `Win32::NetworkManagement::IpHelper::AF_INET6.0` casted as `u16`
-const AF_INET6: u16 = windows::Win32::Networking::WinSock::AF_INET6.0 as u16;
+/// A constant to store ` winapi::shared::ws2def::AF_INET6` casted as `u16`
+const AF_INET6: u16 = winapi::shared::ws2def::AF_INET6 as u16;
 
 /// The address family of the addresses to retrieve. This parameter must be one of the following values.
 /// The default address family is `AF_UNSPECT` in order to gather both IPv4 and IPv6 network interfaces.
 ///
 /// Source: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses#parameters
-const GET_ADAPTERS_ADDRESSES_FAMILY: ADDRESS_FAMILY = ADDRESS_FAMILY(AF_UNSPEC.0);
+const GET_ADAPTERS_ADDRESSES_FAMILY: u32 = AF_UNSPEC as u32;
 
-const GET_ADAPTERS_ADDRESSES_FLAGS: GetAdaptersAddressesFlags =
-    windows::Win32::NetworkManagement::IpHelper::GAA_FLAG_INCLUDE_PREFIX;
+/// A constant to store `winapi::um::iptypes::GAA_FLAG_INCLUDE_PREFIX`
+const GET_ADAPTERS_ADDRESSES_FLAGS: ULONG = winapi::um::iptypes::GAA_FLAG_INCLUDE_PREFIX;
 
 impl NetworkInterfaceConfig for NetworkInterface {
     fn show() -> Result<Vec<NetworkInterface>> {
@@ -74,7 +77,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
                 GetAdaptersAddresses(
                     GET_ADAPTERS_ADDRESSES_FAMILY,
                     GET_ADAPTERS_ADDRESSES_FLAGS,
-                    null_mut::<c_void>(),
+                    null_mut(),
                     adapter_address,
                     &mut size_pointer,
                 )
@@ -178,7 +181,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
 
 /// Retrieves the network interface name
 fn make_adapter_address_name(adapter_address: &*mut AdapterAddress) -> Result<String> {
-    let address_name = unsafe { (*(*adapter_address)).FriendlyName.0 };
+    let address_name = unsafe { (*(*adapter_address)).FriendlyName };
     let address_name_length = unsafe { wcslen(address_name as *const wchar_t) };
     let byte_slice = unsafe { from_raw_parts(address_name, address_name_length) };
     let string = String::from_utf16(byte_slice).map_err(Error::from)?;
@@ -188,15 +191,15 @@ fn make_adapter_address_name(adapter_address: &*mut AdapterAddress) -> Result<St
 
 /// Creates a `Ipv6Addr` from a `SOCKADDR_IN6`
 fn make_ipv6_addr(sockaddr: &*mut SOCKADDR_IN6) -> Result<Ipv6Addr> {
-    let address_bytes = unsafe { (*(*sockaddr)).sin6_addr.u.Byte };
-    let ip = Ipv6Addr::from(address_bytes);
+    let address_bytes = unsafe { (*(*sockaddr)).sin6_addr.u.Byte() };
+    let ip = Ipv6Addr::from(*address_bytes);
 
     Ok(ip)
 }
 
 /// Creates a `Ipv4Addr` from a `SOCKADDR_IN`
 fn make_ipv4_addr(sockaddr: &*mut SOCKADDR_IN) -> Result<Ipv4Addr> {
-    let address = unsafe { (*(*sockaddr)).sin_addr.S_un.S_addr };
+    let address = unsafe { (*(*sockaddr)).sin_addr.S_un.S_addr() };
 
     if cfg!(target_endian = "little") {
         // due to a difference on how bytes are arranged on a
@@ -207,7 +210,7 @@ fn make_ipv4_addr(sockaddr: &*mut SOCKADDR_IN) -> Result<Ipv4Addr> {
         return Ok(Ipv4Addr::from(address.swap_bytes()));
     }
 
-    Ok(Ipv4Addr::from(address))
+    Ok(Ipv4Addr::from(*address))
 }
 
 /// This function relies on the `GetAdapterAddresses` API which is available only on Windows Vista
@@ -220,7 +223,7 @@ fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Ne
     let on_link_prefix_length = unsafe { (*(*unicast_address)).OnLinkPrefixLength };
 
     match unsafe { ConvertLengthToIpv4Mask(on_link_prefix_length as u32, mask) } {
-        Ok(_) => {
+        0.. => {
             let mask = unsafe { *mask };
 
             if cfg!(target_endian = "little") {
@@ -234,7 +237,6 @@ fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Ne
 
             Some(Ipv4Addr::from(mask))
         }
-        Err(_) => None,
     }
 }
 
