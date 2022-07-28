@@ -2,8 +2,9 @@ use std::mem;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::slice::from_raw_parts;
 
-use libc::{AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen};
+use libc::{AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen, AF_LINK};
 
+use crate::target::lladdr;
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
 use crate::utils::{
     NetIfaAddrPtr, ipv4_from_in_addr, ipv6_from_in6_addr, make_ipv4_netmask, make_ipv6_netmask,
@@ -48,6 +49,23 @@ impl NetworkInterfaceConfig for NetworkInterface {
             let netifa_family = unsafe { (*netifa_addr).sa_family as i32 };
 
             match netifa_family {
+                AF_LINK => {
+                    let mut mac = [0; 6];
+                    let mut ptr = unsafe { lladdr(*netifa) };
+
+                    for i in 0..6 {
+                        mac[i] = unsafe { *ptr };
+                        ptr = ((ptr as usize) + 1) as *const u8;
+                    }
+
+                    println!(
+                        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+                        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+                    );
+
+                    advance(None);
+                    continue;
+                }
                 AF_INET => {
                     let netifa_addr = netifa_addr;
                     let socket_addr = netifa_addr as *mut sockaddr_in;
