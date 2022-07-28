@@ -40,3 +40,9 @@ bundle
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Rust #
+########
+# Ignores `Cargo.lock` as recommended here:
+# https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html#cargotoml-vs-cargolock
+Cargo.lock
