@@ -53,8 +53,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let mut mac = [0; 6];
                     let mut ptr = unsafe { lladdr(*netifa) };
 
-                    for i in 0..6 {
-                        mac[i] = unsafe { *ptr };
+                    for el in &mut mac {
+                        *el = unsafe { *ptr };
                         ptr = ((ptr as usize) + 1) as *const u8;
                     }
 
