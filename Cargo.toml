@@ -1,12 +1,12 @@
 [package]
 name = "network-interface"
 description = "Retrieve system's Network Interfaces on Linux, macOS and Windows on a standarized manner"
+version = "0.1.2"
 repository = "https://github.com/EstebanBorai/network-interface"
 categories = ["web-programming", "network-programming"]
 homepage = "https://github.com/EstebanBorai/network-interface"
 keywords = ["network", "interfaces", "ip", "web", "network"]
 license = "MIT OR Apache-2.0"
-version = "0.1.1"
 authors = ["Esteban Borai <estebanborai@gmail.com>"]
 edition = "2018"
 readme = "README.md"
