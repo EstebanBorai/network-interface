@@ -15,6 +15,8 @@ pub struct NetworkInterface {
     pub name: String,
     /// Interface's address
     pub addr: Option<Addr>,
+    /// MAC Address
+    pub mac_addr: Option<String>,
 }
 
 /// Network interface address
@@ -64,6 +66,7 @@ impl NetworkInterface {
         NetworkInterface {
             name: name.to_string(),
             addr: Some(Addr::V4(ifaddr_v4)),
+            mac_addr: None,
         }
     }
 
@@ -82,6 +85,7 @@ impl NetworkInterface {
         NetworkInterface {
             name: name.to_string(),
             addr: Some(Addr::V6(ifaddr_v6)),
+            mac_addr: None,
         }
     }
 }

@@ -7,8 +7,9 @@ fn main() {
         let path = Path::new("src")
             .join("target")
             .join("macos")
-            .join("helpers.c");
+            .join("ffi")
+            .join("lladdr.c");
 
-        Build::new().file(path).compile("helpers");
+        Build::new().file(path).compile("ffi");
     }
 }

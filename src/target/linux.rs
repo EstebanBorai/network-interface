@@ -145,15 +145,3 @@ fn make_ipv6_broadcast_addr(netifa: &NetIfaAddrPtr) -> Result<Option<Ipv6Addr>> 
 
     Ok(Some(addr))
 }
-
-#[cfg(target_os = "linux")]
-mod tests {
-    #[test]
-    fn show_network_interfaces() {
-        use super::{NetworkInterface, NetworkInterfaceConfig};
-
-        let network_interfaces = NetworkInterface::show().unwrap();
-
-        assert!(network_interfaces.len() > 1);
-    }
-}
