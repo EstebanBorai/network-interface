@@ -1,9 +1,13 @@
+pub mod ffi;
+
+use std::collections::HashMap;
 use std::mem;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::slice::from_raw_parts;
 
-use libc::{AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen};
+use libc::{AF_INET, AF_INET6, getifaddrs, ifaddrs, malloc, sockaddr_in, sockaddr_in6, strlen, AF_LINK};
 
+use crate::target::ffi::lladdr;
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
 use crate::utils::{
     NetIfaAddrPtr, ipv4_from_in_addr, ipv6_from_in6_addr, make_ipv4_netmask, make_ipv6_netmask,
@@ -24,7 +28,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
             ));
         }
 
-        let mut network_interfaces: Vec<NetworkInterface> = Vec::new();
+        let mut network_interfaces: HashMap<String, NetworkInterface> = HashMap::new();
         let netifa = addr;
 
         let has_current = |netifa: *mut *mut ifaddrs| {
@@ -37,17 +41,28 @@ impl NetworkInterfaceConfig for NetworkInterface {
 
         let mut advance = |network_interface: Option<NetworkInterface>| {
             if let Some(network_interface) = network_interface {
-                network_interfaces.push(network_interface);
+                network_interfaces.insert(network_interface.name.clone(), network_interface);
             }
 
             unsafe { *netifa = (**netifa).ifa_next };
         };
+
+        let mut mac_addresses: HashMap<String, String> = HashMap::new();
 
         while has_current(netifa) {
             let netifa_addr = unsafe { (**netifa).ifa_addr };
             let netifa_family = unsafe { (*netifa_addr).sa_family as i32 };
 
             match netifa_family {
+                AF_LINK => {
+                    let name = make_netifa_name(&netifa)?;
+                    let mac = make_mac_addrs(&netifa);
+
+                    mac_addresses.insert(name, mac);
+
+                    advance(None);
+                    continue;
+                }
                 AF_INET => {
                     let netifa_addr = netifa_addr;
                     let socket_addr = netifa_addr as *mut sockaddr_in;
@@ -83,7 +98,13 @@ impl NetworkInterfaceConfig for NetworkInterface {
             }
         }
 
-        Ok(network_interfaces)
+        for (netifa_name, mac_addr) in mac_addresses {
+            if let Some(netifa) = network_interfaces.get_mut(&netifa_name) {
+                netifa.mac_addr = Some(mac_addr);
+            }
+        }
+
+        Ok(network_interfaces.into_values().collect())
     }
 }
 
@@ -140,14 +161,17 @@ fn make_ipv6_broadcast_addr(netifa: &NetIfaAddrPtr) -> Result<Option<Ipv6Addr>> 
     Ok(Some(addr))
 }
 
-#[cfg(target_os = "macos")]
-mod tests {
-    #[test]
-    fn show_network_interfaces() {
-        use super::{NetworkInterface, NetworkInterfaceConfig};
+fn make_mac_addrs(netifa: &NetIfaAddrPtr) -> String {
+    let mut mac = [0; 6];
+    let mut ptr = unsafe { lladdr(**netifa) };
 
-        let network_interfaces = NetworkInterface::show().unwrap();
-
-        assert!(network_interfaces.len() > 1);
+    for el in &mut mac {
+        *el = unsafe { *ptr };
+        ptr = ((ptr as usize) + 1) as *const u8;
     }
+
+    format!(
+        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+    )
 }

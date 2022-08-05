@@ -243,15 +243,3 @@ fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Ne
 fn make_ipv6_netmask(_sockaddr: &*mut SOCKADDR_IN6) -> Netmask<Ipv6Addr> {
     None
 }
-
-#[cfg(target_os = "windows")]
-mod tests {
-    #[test]
-    fn show_network_interfaces() {
-        use super::{NetworkInterface, NetworkInterfaceConfig};
-
-        let network_interfaces = NetworkInterface::show().unwrap();
-
-        assert!(network_interfaces.len() > 1);
-    }
-}
