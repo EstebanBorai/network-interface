@@ -177,13 +177,11 @@ fn make_ipv6_broadcast_addr(netifa: &NetIfaAddrPtr) -> Result<Option<Ipv6Addr>> 
 }
 
 fn make_mac_addrs(netifa: &NetIfaAddrPtr) -> Result<String> {
-    let netifa_addr = netifa;
-    let name = make_netifa_name(&netifa)?;
-    let saddr_ll: *mut *mut sockaddr_ll =
-        unsafe { mem::transmute::<&*mut *mut ifaddrs, *mut *mut sockaddr_ll>(netifa_addr) };
-    let ifa_addr = unsafe { (*(*saddr_ll)).sll_addr };
+    let ifaptr = unsafe { **netifa };
+    let saddr_ll = ifaptr as *mut sockaddr_ll;
+    let ifa_addr = unsafe { (*saddr_ll).sll_addr };
 
-    println!("{}: {:?}", name, ifa_addr);
+    println!("{:?}", ifa_addr);
 
     Ok(String::default())
 }
