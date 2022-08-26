@@ -2,7 +2,7 @@
 //! linked list provided by system functions like `getifaddrs` and
 //! `GetAdaptersAddresses`.
 use std::fmt::Debug;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// An alias for an `Option` that wraps either a `Ipv4Addr` or a `Ipv6Addr`
 /// representing the IP for a Network Interface netmask
@@ -86,6 +86,29 @@ impl NetworkInterface {
             name: name.to_string(),
             addr: Some(Addr::V6(ifaddr_v6)),
             mac_addr: None,
+        }
+    }
+}
+
+impl Addr {
+    pub fn ip(self) -> IpAddr {
+        match self {
+            Addr::V4(ifaddr_v4) => ifaddr_v4.ip.into(),
+            Addr::V6(ifaddr_v6) => ifaddr_v6.ip.into(),
+        }
+    }
+
+    pub fn broadcast(self) -> Option<IpAddr> {
+        match self {
+            Addr::V4(ifaddr_v4) => ifaddr_v4.broadcast.map(Into::into),
+            Addr::V6(ifaddr_v6) => ifaddr_v6.broadcast.map(Into::into),
+        }
+    }
+
+    pub fn netmask(self) -> Netmask<IpAddr> {
+        match self {
+            Addr::V4(ifaddr_v4) => ifaddr_v4.netmask.map(Into::into),
+            Addr::V6(ifaddr_v6) => ifaddr_v6.netmask.map(Into::into),
         }
     }
 }
