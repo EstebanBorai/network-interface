@@ -5,7 +5,9 @@ use std::fmt::Debug;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Serializer};
+#[cfg(feature = "serde")]
+use serde::ser::SerializeStruct;
 
 /// An alias for an `Option` that wraps either a `Ipv4Addr` or a `Ipv6Addr`
 /// representing the IP for a Network Interface netmask
@@ -13,7 +15,6 @@ pub type Netmask<T> = Option<T>;
 
 /// A system's network interface
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct NetworkInterface {
     /// Interface's name
     pub name: String,
@@ -23,38 +24,19 @@ pub struct NetworkInterface {
     pub mac_addr: Option<String>,
 }
 
-/// Network interface address
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub enum Addr {
-    /// IPV4 Interface from the AFINET network interface family
-    V4(V4IfAddr),
-    /// IPV6 Interface from the AFINET6 network interface family
-    V6(V6IfAddr),
-}
+#[cfg(feature = "serde")]
+impl Serialize for NetworkInterface {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("NetworkInterface", 3)?;
 
-/// IPV4 Interface from the AFINET network interface family
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct V4IfAddr {
-    /// The IP address for this network interface
-    pub ip: Ipv4Addr,
-    /// The broadcast address for this interface
-    pub broadcast: Option<Ipv4Addr>,
-    /// The netmask for this interface
-    pub netmask: Netmask<Ipv4Addr>,
-}
-
-/// IPV6 Interface from the AFINET6 network interface family
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct V6IfAddr {
-    /// The IP address for this network interface
-    pub ip: Ipv6Addr,
-    /// The broadcast address for this interface
-    pub broadcast: Option<Ipv6Addr>,
-    /// The netmask for this interface
-    pub netmask: Netmask<Ipv6Addr>,
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field("addr", &self.addr)?;
+        state.serialize_field("mac_addr", &self.mac_addr)?;
+        state.end()
+    }
 }
 
 impl NetworkInterface {
@@ -97,6 +79,28 @@ impl NetworkInterface {
     }
 }
 
+/// Network interface address
+#[derive(Debug, Clone, Copy)]
+pub enum Addr {
+    /// IPV4 Interface from the AFINET network interface family
+    V4(V4IfAddr),
+    /// IPV6 Interface from the AFINET6 network interface family
+    V6(V6IfAddr),
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Addr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            Addr::V4(v4_if_addr) => v4_if_addr.serialize(serializer),
+            Addr::V6(v6_if_addr) => v6_if_addr.serialize(serializer),
+        }
+    }
+}
+
 impl Addr {
     pub fn ip(self) -> IpAddr {
         match self {
@@ -117,5 +121,57 @@ impl Addr {
             Addr::V4(ifaddr_v4) => ifaddr_v4.netmask.map(Into::into),
             Addr::V6(ifaddr_v6) => ifaddr_v6.netmask.map(Into::into),
         }
+    }
+}
+
+/// IPV4 Interface from the AFINET network interface family
+#[derive(Debug, Clone, Copy)]
+pub struct V4IfAddr {
+    /// The IP address for this network interface
+    pub ip: Ipv4Addr,
+    /// The broadcast address for this interface
+    pub broadcast: Option<Ipv4Addr>,
+    /// The netmask for this interface
+    pub netmask: Netmask<Ipv4Addr>,
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for V4IfAddr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("V4IfAddr", 3)?;
+
+        state.serialize_field("ip", &self.ip)?;
+        state.serialize_field("broadcast", &self.broadcast)?;
+        state.serialize_field("netmask", &self.netmask)?;
+        state.end()
+    }
+}
+
+/// IPV6 Interface from the AFINET6 network interface family
+#[derive(Debug, Clone, Copy)]
+pub struct V6IfAddr {
+    /// The IP address for this network interface
+    pub ip: Ipv6Addr,
+    /// The broadcast address for this interface
+    pub broadcast: Option<Ipv6Addr>,
+    /// The netmask for this interface
+    pub netmask: Netmask<Ipv6Addr>,
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for V6IfAddr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("V6IfAddr", 3)?;
+
+        state.serialize_field("ip", &self.ip)?;
+        state.serialize_field("broadcast", &self.broadcast)?;
+        state.serialize_field("netmask", &self.netmask)?;
+        state.end()
     }
 }
