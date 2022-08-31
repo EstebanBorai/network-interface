@@ -29,5 +29,8 @@ cc = "1.0.73"
 libc = "0.2.101"
 winapi = {version = "0.3", features = ["ws2def", "ws2ipdef", "netioapi", "iphlpapi", "iptypes", "ntdef"] }
 
+[dev-dependencies]
+serde_test = "1.0.144"
+
 [features]
 serde = ["dep:serde"]
