@@ -88,6 +88,10 @@ impl NetworkInterface {
             mac_addr: None,
         }
     }
+
+    pub fn with_mac_addr(self, mac_addr: Option<String>) -> Self {
+        Self { mac_addr, ..self }
+    }
 }
 
 impl Addr {
