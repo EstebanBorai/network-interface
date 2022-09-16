@@ -18,6 +18,7 @@ use winapi::{
     },
 };
 
+use crate::utils::hex::HexSlice;
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
 use crate::interface::Netmask;
 
@@ -131,6 +132,16 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     current_prefix_address = unsafe { (*current_prefix_address).Next };
                 }
 
+                // see https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses#examples
+                let mac_addr_len = unsafe { (*adapter_address).PhysicalAddressLength } as _;
+                let mac_addr = match mac_addr_len {
+                    0 => None,
+                    len => Some(format!(
+                        "{}",
+                        HexSlice::new(unsafe { &(*adapter_address).PhysicalAddress[..len] })
+                    )),
+                };
+
                 // Find interface addresses
                 let mut current_unicast_address = unsafe { (*adapter_address).FirstUnicastAddress };
 
@@ -147,7 +158,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
                                 addr,
                                 netmask,
                                 bc_addr_ipv4,
-                            );
+                            )
+                            .with_mac_addr(mac_addr.clone());
 
                             network_interfaces.push(network_interface);
                         }
@@ -157,7 +169,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
                             let addr = make_ipv6_addr(&sockaddr)?;
                             let netmask = make_ipv6_netmask(&sockaddr);
                             let network_interface =
-                                NetworkInterface::new_afinet6(&address_name, addr, netmask, None);
+                                NetworkInterface::new_afinet6(&address_name, addr, netmask, None)
+                                    .with_mac_addr(mac_addr.clone());
 
                             network_interfaces.push(network_interface);
                         }
@@ -242,4 +255,38 @@ fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Ne
 
 fn make_ipv6_netmask(_sockaddr: &*mut SOCKADDR_IN6) -> Netmask<Ipv6Addr> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{process::Command, cmp::min};
+
+    use crate::{NetworkInterface, NetworkInterfaceConfig};
+
+    #[test]
+    fn test_mac_addr() {
+        const MAC_ADDR_LEN: usize = "00:22:48:03:ED:76".len();
+
+        let output = Command::new("getmac").arg("/nh").output().unwrap().stdout;
+        let output_string = String::from_utf8(output).unwrap();
+        let mac_addr_list: Vec<_> = output_string
+            .lines()
+            .filter_map(|line| {
+                let line = line.trim();
+                let line = &line[..min(MAC_ADDR_LEN, line.len())];
+                match line.split('-').count() {
+                    6 => Some(line.replace('-', ":")),
+                    _ => None,
+                }
+            })
+            .collect();
+        assert!(mac_addr_list.len() > 0);
+
+        let interfaces = NetworkInterface::show().unwrap();
+        for mac_addr in mac_addr_list {
+            assert!(interfaces
+                .iter()
+                .any(|int| int.mac_addr.as_ref() == Some(&mac_addr)));
+        }
+    }
 }

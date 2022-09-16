@@ -3,7 +3,6 @@ mod interface;
 mod target;
 mod test;
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
 mod utils;
 
 pub use error::*;
