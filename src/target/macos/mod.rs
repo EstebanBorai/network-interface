@@ -28,20 +28,17 @@ impl NetworkInterfaceConfig for NetworkInterface {
             ));
         }
 
-        let mut network_interfaces: HashMap<String, NetworkInterface> = HashMap::new();
+        let mut network_interfaces: HashMap<String, Vec<NetworkInterface>> = HashMap::new();
         let netifa = addr;
 
-        let has_current = |netifa: *mut *mut ifaddrs| {
-            if unsafe { (*netifa).is_null() } {
-                return false;
-            }
-
-            true
-        };
+        let has_current = |netifa: *mut *mut ifaddrs| unsafe { !(*netifa).is_null() };
 
         let mut advance = |network_interface: Option<NetworkInterface>| {
             if let Some(network_interface) = network_interface {
-                network_interfaces.insert(network_interface.name.clone(), network_interface);
+                network_interfaces
+                    .entry(network_interface.name.clone())
+                    .or_insert(vec![])
+                    .push(network_interface);
             }
 
             unsafe { *netifa = (**netifa).ifa_next };
@@ -99,12 +96,17 @@ impl NetworkInterfaceConfig for NetworkInterface {
         }
 
         for (netifa_name, mac_addr) in mac_addresses {
-            if let Some(netifa) = network_interfaces.get_mut(&netifa_name) {
-                netifa.mac_addr = Some(mac_addr);
+            if let Some(netifas) = network_interfaces.get_mut(netifa_name.as_str()) {
+                netifas.iter_mut().for_each(|netifa| {
+                    netifa.mac_addr = Some(mac_addr.clone());
+                });
             }
         }
 
-        Ok(network_interfaces.into_values().collect())
+        Ok(network_interfaces
+            .into_values()
+            .flat_map(|x| x.into_iter())
+            .collect())
     }
 }
 
