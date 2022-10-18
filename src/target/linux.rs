@@ -2,7 +2,10 @@ use std::mem;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::slice::from_raw_parts;
 
-use libc::{getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6, malloc};
+use libc::{
+    getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6, malloc,
+    if_nametoindex,
+};
 
 use crate::interface::Netmask;
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
@@ -60,11 +63,17 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let socket_addr = netifa_addr as *mut sockaddr_in;
                     let internet_address = unsafe { (*socket_addr).sin_addr };
                     let name = make_netifa_name(&netifa)?;
+                    let index = netifa_index(&netifa);
                     let netmask: Netmask<Ipv4Addr> = make_ipv4_netmask(&netifa);
                     let addr = ipv4_from_in_addr(&internet_address)?;
                     let broadcast = make_ipv4_broadcast_addr(&netifa)?;
-                    let network_interface =
-                        NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast);
+                    let network_interface = NetworkInterface::new_afinet(
+                        name.as_str(),
+                        addr,
+                        netmask,
+                        broadcast,
+                        index,
+                    );
 
                     advance(Some(network_interface));
                 }
@@ -73,11 +82,17 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let socket_addr = netifa_addr as *mut sockaddr_in6;
                     let internet_address = unsafe { (*socket_addr).sin6_addr };
                     let name = make_netifa_name(&netifa)?;
+                    let index = netifa_index(&netifa);
                     let netmask: Netmask<Ipv6Addr> = make_ipv6_netmask(&netifa);
                     let addr = ipv6_from_in6_addr(&internet_address)?;
                     let broadcast = make_ipv6_broadcast_addr(&netifa)?;
-                    let network_interface =
-                        NetworkInterface::new_afinet6(name.as_str(), addr, netmask, broadcast);
+                    let network_interface = NetworkInterface::new_afinet6(
+                        name.as_str(),
+                        addr,
+                        netmask,
+                        broadcast,
+                        index,
+                    );
 
                     advance(Some(network_interface));
                 }
@@ -144,4 +159,16 @@ fn make_ipv6_broadcast_addr(netifa: &NetIfaAddrPtr) -> Result<Option<Ipv6Addr>> 
     let addr = ipv6_from_in6_addr(&internet_address)?;
 
     Ok(Some(addr))
+}
+
+/// Retreives the name for the the network interface provided
+///
+/// ## References
+///
+/// https://man7.org/linux/man-pages/man3/if_nametoindex.3.html
+fn netifa_index(netifa: &NetIfaAddrPtr) -> u32 {
+    let netifa = *netifa;
+    let name = unsafe { (*(*netifa)).ifa_name as *const libc::c_char };
+
+    unsafe { if_nametoindex(name) }
 }
