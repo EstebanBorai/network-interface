@@ -161,6 +161,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
                                 addr,
                                 netmask,
                                 bc_addr_ipv4,
+                                index,
                             )
                             .with_mac_addr(mac_addr.clone());
 
@@ -171,9 +172,14 @@ impl NetworkInterfaceConfig for NetworkInterface {
                                 address.lpSockaddr as *mut SOCKADDR_IN6;
                             let addr = make_ipv6_addr(&sockaddr)?;
                             let netmask = make_ipv6_netmask(&sockaddr);
-                            let network_interface =
-                                NetworkInterface::new_afinet6(&address_name, addr, netmask, None)
-                                    .with_mac_addr(mac_addr.clone(), index);
+                            let network_interface = NetworkInterface::new_afinet6(
+                                &address_name,
+                                addr,
+                                netmask,
+                                None,
+                                index,
+                            )
+                            .with_mac_addr(mac_addr.clone());
 
                             network_interfaces.push(network_interface);
                         }
@@ -267,7 +273,7 @@ fn get_adapter_address_index(adapter_address: &*mut AdapterAddress) -> Result<u3
 
     match unsafe { ConvertInterfaceLuidToIndex(adapter_luid, index) } {
         0 => Ok(*index),
-        e => Err(crate::error::Error::GetIfAddrsError(
+        e => Err(crate::error::Error::GetIfNameError(
             "ConvertInterfaceLuidToIndex".to_string(),
             e,
         )),
