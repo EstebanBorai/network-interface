@@ -269,10 +269,10 @@ fn make_ipv6_netmask(_sockaddr: &*mut SOCKADDR_IN6) -> Netmask<Ipv6Addr> {
 fn get_adapter_address_index(adapter_address: &*mut AdapterAddress) -> Result<u32> {
     let adapter_luid = &unsafe { (*(*adapter_address)).Luid } as *const IF_LUID;
 
-    let index = &mut 0 as *mut u32;
+    let index = &mut 0u32 as *mut u32;
 
     match unsafe { ConvertInterfaceLuidToIndex(adapter_luid, index) } {
-        0 => Ok(*index),
+        0 => Ok(unsafe { *index }),
         e => Err(crate::error::Error::GetIfNameError(
             "ConvertInterfaceLuidToIndex".to_string(),
             e,
