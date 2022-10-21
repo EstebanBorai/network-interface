@@ -9,8 +9,9 @@ use winapi::{
     shared::{
         ws2def::{AF_UNSPEC, SOCKADDR_IN},
         ws2ipdef::SOCKADDR_IN6,
-        netioapi::ConvertLengthToIpv4Mask,
+        netioapi::{ConvertLengthToIpv4Mask, ConvertInterfaceLuidToIndex},
         ntdef::ULONG,
+        ifdef::IF_LUID,
     },
     um::{
         iptypes::{IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_UNICAST_ADDRESS_LH},
@@ -100,6 +101,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
             while !adapter_address.is_null() {
                 let address_name = make_adapter_address_name(&adapter_address)?;
 
+                let index = get_adapter_address_index(&adapter_address)?;
+
                 // Find broadcast address
                 //
                 // see https://docs.microsoft.com/en-us/windows/win32/api/iptypes/ns-iptypes-ip_adapter_addresses_lh
@@ -158,6 +161,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
                                 addr,
                                 netmask,
                                 bc_addr_ipv4,
+                                index,
                             )
                             .with_mac_addr(mac_addr.clone());
 
@@ -168,9 +172,14 @@ impl NetworkInterfaceConfig for NetworkInterface {
                                 address.lpSockaddr as *mut SOCKADDR_IN6;
                             let addr = make_ipv6_addr(&sockaddr)?;
                             let netmask = make_ipv6_netmask(&sockaddr);
-                            let network_interface =
-                                NetworkInterface::new_afinet6(&address_name, addr, netmask, None)
-                                    .with_mac_addr(mac_addr.clone());
+                            let network_interface = NetworkInterface::new_afinet6(
+                                &address_name,
+                                addr,
+                                netmask,
+                                None,
+                                index,
+                            )
+                            .with_mac_addr(mac_addr.clone());
 
                             network_interfaces.push(network_interface);
                         }
@@ -255,6 +264,20 @@ fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Ne
 
 fn make_ipv6_netmask(_sockaddr: &*mut SOCKADDR_IN6) -> Netmask<Ipv6Addr> {
     None
+}
+
+fn get_adapter_address_index(adapter_address: &*mut AdapterAddress) -> Result<u32> {
+    let adapter_luid = &unsafe { (*(*adapter_address)).Luid } as *const IF_LUID;
+
+    let index = &mut 0u32 as *mut u32;
+
+    match unsafe { ConvertInterfaceLuidToIndex(adapter_luid, index) } {
+        0 => Ok(unsafe { *index }),
+        e => Err(crate::error::Error::GetIfNameError(
+            "ConvertInterfaceLuidToIndex".to_string(),
+            e,
+        )),
+    }
 }
 
 #[cfg(test)]

@@ -4,6 +4,8 @@ use std::string::{FromUtf16Error, FromUtf8Error};
 pub enum Error {
     #[error("Failed to execute `{0}`. Received error code `{1}`")]
     GetIfAddrsError(String, i32),
+    #[error("Failed to execute `{0}`. Received error code `{1}`")]
+    GetIfNameError(String, u32),
     #[error("Failed to parse bytes into UTF-8 characters. `{0}`")]
     ParseUtf8Error(FromUtf8Error),
     #[error("Failed to parse bytes into UTF-16 characters. `{0}`")]

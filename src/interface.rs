@@ -17,6 +17,8 @@ pub struct NetworkInterface {
     pub addr: Option<Addr>,
     /// MAC Address
     pub mac_addr: Option<String>,
+    /// Interface's index
+    pub index: u32,
 }
 
 /// Network interface address
@@ -56,6 +58,7 @@ impl NetworkInterface {
         addr: Ipv4Addr,
         netmask: Netmask<Ipv4Addr>,
         broadcast: Option<Ipv4Addr>,
+        index: u32,
     ) -> NetworkInterface {
         let ifaddr_v4 = V4IfAddr {
             ip: addr,
@@ -67,6 +70,7 @@ impl NetworkInterface {
             name: name.to_string(),
             addr: Some(Addr::V4(ifaddr_v4)),
             mac_addr: None,
+            index,
         }
     }
 
@@ -75,6 +79,7 @@ impl NetworkInterface {
         addr: Ipv6Addr,
         netmask: Netmask<Ipv6Addr>,
         broadcast: Option<Ipv6Addr>,
+        index: u32,
     ) -> NetworkInterface {
         let ifaddr_v6 = V6IfAddr {
             ip: addr,
@@ -86,6 +91,7 @@ impl NetworkInterface {
             name: name.to_string(),
             addr: Some(Addr::V6(ifaddr_v6)),
             mac_addr: None,
+            index,
         }
     }
 
