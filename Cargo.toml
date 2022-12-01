@@ -1,7 +1,7 @@
 [package]
 name = "network-interface"
 description = "Retrieve system's Network Interfaces on Linux, macOS and Windows on a standarized manner"
-version = "0.1.4"
+version = "0.1.5"
 repository = "https://github.com/EstebanBorai/network-interface"
 categories = ["web-programming", "network-programming"]
 homepage = "https://github.com/EstebanBorai/network-interface"
