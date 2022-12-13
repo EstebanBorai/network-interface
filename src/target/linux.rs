@@ -5,7 +5,7 @@ use std::slice::from_raw_parts;
 
 use libc::{
     getifaddrs, ifaddrs, sockaddr_in, sockaddr_in6, strlen, AF_INET, AF_INET6, malloc,
-    if_nametoindex, AF_PACKET, sockaddr_ll
+    if_nametoindex, AF_PACKET, sockaddr_ll,
 };
 
 use crate::interface::Netmask;
@@ -187,9 +187,13 @@ fn make_mac_addrs(netifa: &NetIfaAddrPtr) -> String {
     let mac_array = unsafe { (*socket_addr).sll_addr };
     let addr_len = unsafe { (*socket_addr).sll_halen };
     let real_addr_len = std::cmp::min(addr_len as usize, mac_array.len());
-    let mac_slice =  unsafe { std::slice::from_raw_parts(mac_array.as_ptr(), real_addr_len) };
+    let mac_slice = unsafe { std::slice::from_raw_parts(mac_array.as_ptr(), real_addr_len) };
 
-    mac_slice.iter().map(|x| format!("{:02x}", x)).collect::<Vec<_>>().join(":")
+    mac_slice
+        .iter()
+        .map(|x| format!("{:02x}", x))
+        .collect::<Vec<_>>()
+        .join(":")
 }
 
 /// Retreives the name for the the network interface provided
