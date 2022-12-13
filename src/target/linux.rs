@@ -39,7 +39,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
             if let Some(network_interface) = network_interface {
                 network_interfaces
                     .entry(network_interface.name.clone())
-                    .or_insert(vec![])
+                    .or_default()
                     .push(network_interface);
             }
 
