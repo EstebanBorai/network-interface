@@ -1,6 +1,7 @@
 # Application Related #
 #######################
 .vscode/
+.cargo/
 /target
 
 # Compiled source #

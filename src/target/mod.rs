@@ -15,3 +15,9 @@ mod windows;
 
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
+
+#[cfg(not(target_os = "windows"))]
+mod getifaddrs;
+
+#[cfg(not(target_os = "windows"))]
+pub use getifaddrs::*;
