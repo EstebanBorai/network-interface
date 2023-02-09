@@ -17,7 +17,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
         let mut mac_addresses: HashMap<String, String> = HashMap::new();
 
         for netifa in getifaddrs()? {
-            let netifa_addr = unsafe { (*netifa).ifa_addr };
+            let netifa_addr = netifa.ifa_addr;
             let netifa_family = if netifa_addr.is_null() {
                 None
             } else {
@@ -26,19 +26,19 @@ impl NetworkInterfaceConfig for NetworkInterface {
 
             let network_interface = match netifa_family {
                 Some(AF_PACKET) => {
-                    let name = make_netifa_name(netifa)?;
-                    let mac = make_mac_addrs(netifa);
+                    let name = make_netifa_name(&netifa)?;
+                    let mac = make_mac_addrs(&netifa);
                     mac_addresses.insert(name, mac);
                     None
                 }
                 Some(AF_INET) => {
                     let socket_addr = netifa_addr as *mut sockaddr_in;
                     let internet_address = unsafe { (*socket_addr).sin_addr };
-                    let name = make_netifa_name(netifa)?;
-                    let index = netifa_index(netifa);
-                    let netmask = make_ipv4_netmask(netifa);
+                    let name = make_netifa_name(&netifa)?;
+                    let index = netifa_index(&netifa);
+                    let netmask = make_ipv4_netmask(&netifa);
                     let addr = ipv4_from_in_addr(&internet_address)?;
-                    let broadcast = make_ipv4_broadcast_addr(netifa)?;
+                    let broadcast = make_ipv4_broadcast_addr(&netifa)?;
                     Some(NetworkInterface::new_afinet(
                         name.as_str(),
                         addr,
@@ -50,11 +50,11 @@ impl NetworkInterfaceConfig for NetworkInterface {
                 Some(AF_INET6) => {
                     let socket_addr = netifa_addr as *mut sockaddr_in6;
                     let internet_address = unsafe { (*socket_addr).sin6_addr };
-                    let name = make_netifa_name(netifa)?;
-                    let index = netifa_index(netifa);
-                    let netmask = make_ipv6_netmask(netifa);
+                    let name = make_netifa_name(&netifa)?;
+                    let index = netifa_index(&netifa);
+                    let netmask = make_ipv6_netmask(&netifa);
                     let addr = ipv6_from_in6_addr(&internet_address)?;
-                    let broadcast = make_ipv6_broadcast_addr(netifa)?;
+                    let broadcast = make_ipv6_broadcast_addr(&netifa)?;
                     Some(NetworkInterface::new_afinet6(
                         name.as_str(),
                         addr,
@@ -90,8 +90,8 @@ impl NetworkInterfaceConfig for NetworkInterface {
 }
 
 /// Retrieves the network interface name
-fn make_netifa_name(netifa: *mut libc::ifaddrs) -> Result<String> {
-    let data = unsafe { (*netifa).ifa_name as *const libc::c_char };
+fn make_netifa_name(netifa: &libc::ifaddrs) -> Result<String> {
+    let data = netifa.ifa_name as *const libc::c_char;
     let len = unsafe { strlen(data) };
     let bytes_slice = unsafe { from_raw_parts(data as *const u8, len) };
 
@@ -107,8 +107,8 @@ fn make_netifa_name(netifa: *mut libc::ifaddrs) -> Result<String> {
 /// ## References
 ///
 /// https://man7.org/linux/man-pages/man3/getifaddrs.3.html
-fn make_ipv4_broadcast_addr(netifa: *mut libc::ifaddrs) -> Result<Option<Ipv4Addr>> {
-    let ifa_dstaddr = unsafe { (*netifa).ifa_ifu };
+fn make_ipv4_broadcast_addr(netifa: &libc::ifaddrs) -> Result<Option<Ipv4Addr>> {
+    let ifa_dstaddr = netifa.ifa_ifu;
 
     if ifa_dstaddr.is_null() {
         return Ok(None);
@@ -127,8 +127,8 @@ fn make_ipv4_broadcast_addr(netifa: *mut libc::ifaddrs) -> Result<Option<Ipv4Add
 /// ## References
 ///
 /// https://man7.org/linux/man-pages/man3/getifaddrs.3.html
-fn make_ipv6_broadcast_addr(netifa: *mut libc::ifaddrs) -> Result<Option<Ipv6Addr>> {
-    let ifa_dstaddr = unsafe { (*netifa).ifa_ifu };
+fn make_ipv6_broadcast_addr(netifa: &libc::ifaddrs) -> Result<Option<Ipv6Addr>> {
+    let ifa_dstaddr = netifa.ifa_ifu;
 
     if ifa_dstaddr.is_null() {
         return Ok(None);
@@ -141,8 +141,8 @@ fn make_ipv6_broadcast_addr(netifa: *mut libc::ifaddrs) -> Result<Option<Ipv6Add
     Ok(Some(addr))
 }
 
-fn make_mac_addrs(netifa: *mut libc::ifaddrs) -> String {
-    let netifa_addr = unsafe { (*netifa).ifa_addr };
+fn make_mac_addrs(netifa: &libc::ifaddrs) -> String {
+    let netifa_addr = netifa.ifa_addr;
     let socket_addr = netifa_addr as *mut sockaddr_ll;
     let mac_array = unsafe { (*socket_addr).sll_addr };
     let addr_len = unsafe { (*socket_addr).sll_halen };
@@ -161,8 +161,8 @@ fn make_mac_addrs(netifa: *mut libc::ifaddrs) -> String {
 /// ## References
 ///
 /// https://man7.org/linux/man-pages/man3/if_nametoindex.3.html
-fn netifa_index(netifa: *mut libc::ifaddrs) -> u32 {
-    let name = unsafe { (*netifa).ifa_name as *const libc::c_char };
+fn netifa_index(netifa: &libc::ifaddrs) -> u32 {
+    let name = netifa.ifa_name as *const libc::c_char;
 
     unsafe { if_nametoindex(name) }
 }
