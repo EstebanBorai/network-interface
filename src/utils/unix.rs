@@ -30,8 +30,8 @@ pub fn ipv6_from_in6_addr(internet_address: &in6_addr) -> Result<Ipv6Addr> {
 
 /// Retrieves the Netmask from a `ifaddrs` instance for a network interface
 /// from the AF_INET (IPv4) family.
-pub fn make_ipv4_netmask(netifa: *mut libc::ifaddrs) -> Netmask<Ipv4Addr> {
-    let sockaddr = unsafe { (*netifa).ifa_netmask };
+pub fn make_ipv4_netmask(netifa: &libc::ifaddrs) -> Netmask<Ipv4Addr> {
+    let sockaddr = netifa.ifa_netmask;
 
     if sockaddr.is_null() {
         return None;
@@ -45,8 +45,8 @@ pub fn make_ipv4_netmask(netifa: *mut libc::ifaddrs) -> Netmask<Ipv4Addr> {
 
 /// Retrieves the Netmask from a `ifaddrs` instance for a network interface
 /// from the AF_INET6 (IPv6) family.
-pub fn make_ipv6_netmask(netifa: *mut libc::ifaddrs) -> Netmask<Ipv6Addr> {
-    let sockaddr = unsafe { (*netifa).ifa_netmask };
+pub fn make_ipv6_netmask(netifa: &libc::ifaddrs) -> Netmask<Ipv6Addr> {
+    let sockaddr = netifa.ifa_netmask;
 
     if sockaddr.is_null() {
         return None;

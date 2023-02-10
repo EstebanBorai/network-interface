@@ -7,15 +7,15 @@ pub struct IfAddrIterator {
 }
 
 impl Iterator for IfAddrIterator {
-    type Item = *mut libc::ifaddrs;
+    type Item = libc::ifaddrs;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = unsafe { (*self.next).ifa_next };
-        if next.is_null() {
-            None
-        } else {
-            self.next = next;
-            Some(next)
+        match unsafe { self.next.as_ref() } {
+            Some(ifaddrs) => {
+                self.next = ifaddrs.ifa_next;
+                Some(ifaddrs.to_owned())
+            }
+            None => None,
         }
     }
 }
