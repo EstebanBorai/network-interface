@@ -13,25 +13,29 @@ use crate::utils::{ipv4_from_in_addr, ipv6_from_in6_addr, make_ipv4_netmask, mak
 
 impl NetworkInterfaceConfig for NetworkInterface {
     fn show() -> Result<Vec<NetworkInterface>> {
-        let mut network_interfaces: HashMap<String, Vec<NetworkInterface>> = HashMap::new();
-        let mut mac_addresses: HashMap<String, String> = HashMap::new();
+        let mut network_interfaces: HashMap<String, NetworkInterface> = HashMap::new();
 
         for netifa in getifaddrs()? {
             let netifa_addr = netifa.ifa_addr;
             let netifa_family = if netifa_addr.is_null() {
-                None
+                continue;
             } else {
-                Some(unsafe { (*netifa_addr).sa_family as i32 })
+                unsafe { (*netifa_addr).sa_family as i32 }
             };
 
-            let network_interface = match netifa_family {
-                Some(AF_PACKET) => {
+            let mut network_interface = match netifa_family {
+                AF_PACKET => {
                     let name = make_netifa_name(&netifa)?;
                     let mac = make_mac_addrs(&netifa);
-                    mac_addresses.insert(name, mac);
-                    None
+                    let index = netifa_index(&netifa);
+                    NetworkInterface {
+                        name,
+                        addr: Vec::new(),
+                        mac_addr: Some(mac),
+                        index,
+                    }
                 }
-                Some(AF_INET) => {
+                AF_INET => {
                     let socket_addr = netifa_addr as *mut sockaddr_in;
                     let internet_address = unsafe { (*socket_addr).sin_addr };
                     let name = make_netifa_name(&netifa)?;
@@ -39,15 +43,9 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let netmask = make_ipv4_netmask(&netifa);
                     let addr = ipv4_from_in_addr(&internet_address)?;
                     let broadcast = make_ipv4_broadcast_addr(&netifa)?;
-                    Some(NetworkInterface::new_afinet(
-                        name.as_str(),
-                        addr,
-                        netmask,
-                        broadcast,
-                        index,
-                    ))
+                    NetworkInterface::new_afinet(name.as_str(), addr, netmask, broadcast, index)
                 }
-                Some(AF_INET6) => {
+                AF_INET6 => {
                     let socket_addr = netifa_addr as *mut sockaddr_in6;
                     let internet_address = unsafe { (*socket_addr).sin6_addr };
                     let name = make_netifa_name(&netifa)?;
@@ -55,37 +53,18 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     let netmask = make_ipv6_netmask(&netifa);
                     let addr = ipv6_from_in6_addr(&internet_address)?;
                     let broadcast = make_ipv6_broadcast_addr(&netifa)?;
-                    Some(NetworkInterface::new_afinet6(
-                        name.as_str(),
-                        addr,
-                        netmask,
-                        broadcast,
-                        index,
-                    ))
+                    NetworkInterface::new_afinet6(name.as_str(), addr, netmask, broadcast, index)
                 }
-                _ => None,
+                _ => continue,
             };
 
-            if let Some(network_interface) = network_interface {
-                network_interfaces
-                    .entry(network_interface.name.clone())
-                    .or_default()
-                    .push(network_interface);
-            }
+            network_interfaces
+                .entry(network_interface.name.clone())
+                .and_modify(|old| old.addr.append(&mut network_interface.addr))
+                .or_insert(network_interface);
         }
 
-        for (netifa_name, mac_addr) in mac_addresses {
-            if let Some(netifas) = network_interfaces.get_mut(netifa_name.as_str()) {
-                netifas.iter_mut().for_each(|netifa| {
-                    netifa.mac_addr = Some(mac_addr.clone());
-                });
-            }
-        }
-
-        Ok(network_interfaces
-            .into_values()
-            .flat_map(|x| x.into_iter())
-            .collect())
+        Ok(network_interfaces.into_values().collect())
     }
 }
 
