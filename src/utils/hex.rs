@@ -15,9 +15,9 @@ impl<'a> Display for HexSlice<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (index, byte) in self.0.iter().enumerate() {
             if index > 0 {
-                write!(f, ":{byte:02X}")?;
+                write!(f, ":{:02X}", byte)?;
             } else {
-                write!(f, "{byte:02X}")?;
+                write!(f, "{:02X}", byte)?;
             }
         }
         Ok(())
