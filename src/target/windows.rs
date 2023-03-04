@@ -244,22 +244,20 @@ fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Ne
     let mask = unsafe { malloc(size_of::<u32>()) as *mut u32 };
     let on_link_prefix_length = unsafe { (*(*unicast_address)).OnLinkPrefixLength };
 
-    match unsafe { ConvertLengthToIpv4Mask(on_link_prefix_length as u32, mask) } {
-        0.. => {
-            let mask = unsafe { *mask };
+    unsafe { ConvertLengthToIpv4Mask(on_link_prefix_length as u32, mask) };
 
-            if cfg!(target_endian = "little") {
-                // due to a difference on how bytes are arranged on a
-                // single word of memory by the CPU, swap bytes based
-                // on CPU endianess to avoid having twisted IP addresses
-                //
-                // refer: https://github.com/rust-lang/rust/issues/48819
-                return Some(Ipv4Addr::from(mask.swap_bytes()));
-            }
+    let mask = unsafe { *mask };
 
-            Some(Ipv4Addr::from(mask))
-        }
+    if cfg!(target_endian = "little") {
+        // due to a difference on how bytes are arranged on a
+        // single word of memory by the CPU, swap bytes based
+        // on CPU endianess to avoid having twisted IP addresses
+        //
+        // refer: https://github.com/rust-lang/rust/issues/48819
+        return Some(Ipv4Addr::from(mask.swap_bytes()));
     }
+
+    Some(Ipv4Addr::from(mask))
 }
 
 fn make_ipv6_netmask(_sockaddr: &*mut SOCKADDR_IN6) -> Netmask<Ipv6Addr> {

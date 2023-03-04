@@ -130,7 +130,7 @@ fn make_mac_addrs(netifa: &libc::ifaddrs) -> String {
 
     mac_slice
         .iter()
-        .map(|x| format!("{x:02x}"))
+        .map(|x| format!("{:02x}", x))
         .collect::<Vec<_>>()
         .join(":")
 }
