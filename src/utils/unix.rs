@@ -1,11 +1,8 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
-use libc::{ifaddrs, in6_addr, in_addr, sockaddr_in, sockaddr_in6};
+use libc::{in6_addr, in_addr, sockaddr_in, sockaddr_in6};
 
 use crate::Result;
 use crate::interface::Netmask;
-
-/// `ifaddrs` struct raw pointer alias
-pub type NetIfaAddrPtr = *mut *mut ifaddrs;
 
 /// Creates a `Ipv4Addr` from a (Unix) `in_addr` taking in account
 /// the CPU endianess to avoid having twisted IP addresses.
@@ -33,9 +30,8 @@ pub fn ipv6_from_in6_addr(internet_address: &in6_addr) -> Result<Ipv6Addr> {
 
 /// Retrieves the Netmask from a `ifaddrs` instance for a network interface
 /// from the AF_INET (IPv4) family.
-pub fn make_ipv4_netmask(netifa: &NetIfaAddrPtr) -> Netmask<Ipv4Addr> {
-    let netifa = *netifa;
-    let sockaddr = unsafe { (*(*netifa)).ifa_netmask };
+pub fn make_ipv4_netmask(netifa: &libc::ifaddrs) -> Netmask<Ipv4Addr> {
+    let sockaddr = netifa.ifa_netmask;
 
     if sockaddr.is_null() {
         return None;
@@ -49,9 +45,8 @@ pub fn make_ipv4_netmask(netifa: &NetIfaAddrPtr) -> Netmask<Ipv4Addr> {
 
 /// Retrieves the Netmask from a `ifaddrs` instance for a network interface
 /// from the AF_INET6 (IPv6) family.
-pub fn make_ipv6_netmask(netifa: &NetIfaAddrPtr) -> Netmask<Ipv6Addr> {
-    let netifa = *netifa;
-    let sockaddr = unsafe { (*(*netifa)).ifa_netmask };
+pub fn make_ipv6_netmask(netifa: &libc::ifaddrs) -> Netmask<Ipv6Addr> {
+    let sockaddr = netifa.ifa_netmask;
 
     if sockaddr.is_null() {
         return None;

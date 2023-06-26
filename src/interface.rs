@@ -19,9 +19,11 @@ pub struct NetworkInterface {
     /// Interface's name
     pub name: String,
     /// Interface's address
-    pub addr: Option<Addr>,
+    pub addr: Vec<Addr>,
     /// MAC Address
     pub mac_addr: Option<String>,
+    /// Interface's index
+    pub index: u32,
 }
 
 #[cfg(feature = "serde")]
@@ -45,6 +47,7 @@ impl NetworkInterface {
         addr: Ipv4Addr,
         netmask: Netmask<Ipv4Addr>,
         broadcast: Option<Ipv4Addr>,
+        index: u32,
     ) -> NetworkInterface {
         let ifaddr_v4 = V4IfAddr {
             ip: addr,
@@ -54,8 +57,9 @@ impl NetworkInterface {
 
         NetworkInterface {
             name: name.to_string(),
-            addr: Some(Addr::V4(ifaddr_v4)),
+            addr: vec![Addr::V4(ifaddr_v4)],
             mac_addr: None,
+            index,
         }
     }
 
@@ -64,6 +68,7 @@ impl NetworkInterface {
         addr: Ipv6Addr,
         netmask: Netmask<Ipv6Addr>,
         broadcast: Option<Ipv6Addr>,
+        index: u32,
     ) -> NetworkInterface {
         let ifaddr_v6 = V6IfAddr {
             ip: addr,
@@ -73,9 +78,14 @@ impl NetworkInterface {
 
         NetworkInterface {
             name: name.to_string(),
-            addr: Some(Addr::V6(ifaddr_v6)),
+            addr: vec![Addr::V6(ifaddr_v6)],
             mac_addr: None,
+            index,
         }
+    }
+
+    pub fn with_mac_addr(self, mac_addr: Option<String>) -> Self {
+        Self { mac_addr, ..self }
     }
 }
 

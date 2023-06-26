@@ -1,3 +1,5 @@
+#[cfg(windows)]
+pub mod hex;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 mod unix;
 
