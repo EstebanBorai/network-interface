@@ -1,7 +1,7 @@
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 mod linux;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 pub use linux::*;
 
 #[cfg(target_os = "macos")]
