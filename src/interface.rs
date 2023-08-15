@@ -2,7 +2,7 @@
 //! linked list provided by system functions like `getifaddrs` and
 //! `GetAdaptersAddresses`.
 use std::fmt::Debug;
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
