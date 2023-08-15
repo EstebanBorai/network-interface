@@ -2,6 +2,7 @@
 //! linked list provided by system functions like `getifaddrs` and
 //! `GetAdaptersAddresses`.
 use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// An alias for an `Option` that wraps either a `Ipv4Addr` or a `Ipv6Addr`
@@ -9,7 +10,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 pub type Netmask<T> = Option<T>;
 
 /// A system's network interface
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NetworkInterface {
     /// Interface's name
     pub name: String,
@@ -22,7 +23,7 @@ pub struct NetworkInterface {
 }
 
 /// Network interface address
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum Addr {
     /// IPV4 Interface from the AFINET network interface family
     V4(V4IfAddr),
@@ -31,7 +32,7 @@ pub enum Addr {
 }
 
 /// IPV4 Interface from the AFINET network interface family
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct V4IfAddr {
     /// The IP address for this network interface
     pub ip: Ipv4Addr,
@@ -42,7 +43,7 @@ pub struct V4IfAddr {
 }
 
 /// IPV6 Interface from the AFINET6 network interface family
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct V6IfAddr {
     /// The IP address for this network interface
     pub ip: Ipv6Addr,
