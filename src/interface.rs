@@ -10,7 +10,8 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 pub type Netmask<T> = Option<T>;
 
 /// A system's network interface
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct NetworkInterface {
     /// Interface's name
     pub name: String,
@@ -23,7 +24,8 @@ pub struct NetworkInterface {
 }
 
 /// Network interface address
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Addr {
     /// IPV4 Interface from the AFINET network interface family
     V4(V4IfAddr),
@@ -32,7 +34,8 @@ pub enum Addr {
 }
 
 /// IPV4 Interface from the AFINET network interface family
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct V4IfAddr {
     /// The IP address for this network interface
     pub ip: Ipv4Addr,
@@ -43,7 +46,8 @@ pub struct V4IfAddr {
 }
 
 /// IPV6 Interface from the AFINET6 network interface family
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct V6IfAddr {
     /// The IP address for this network interface
     pub ip: Ipv6Addr,
