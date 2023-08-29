@@ -4,11 +4,11 @@ mod linux;
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub use linux::*;
 
-#[cfg(target_os = "macos")]
-mod macos;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+mod apple;
 
-#[cfg(target_os = "macos")]
-pub use macos::*;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub use apple::*;
 
 #[cfg(target_os = "windows")]
 mod windows;

@@ -1,7 +1,7 @@
 <div>
   <h1 align="center">network-interface</h1>
   <h4 align="center">
-    Retrieve system's Network Interfaces/Adapters on Android, Linux, macOS and Windows
+    Retrieve system's Network Interfaces/Adapters on Android, Linux, macOS, iOS and Windows
     on a standarized manner
   </h4>
 </div>
