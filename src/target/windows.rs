@@ -103,38 +103,6 @@ impl NetworkInterfaceConfig for NetworkInterface {
 
                 let index = get_adapter_address_index(&adapter_address)?;
 
-                // Find broadcast address
-                //
-                // see https://docs.microsoft.com/en-us/windows/win32/api/iptypes/ns-iptypes-ip_adapter_addresses_lh
-                //
-                // On Windows Vista and later, the linked IP_ADAPTER_PREFIX structures pointed to by the FirstPrefix
-                // member include three IP adapter prefixes for each IP address assigned to the adapter. These include
-                // 0. the host IP address prefix
-                // 1. the subnet IP address prefix
-                // 2. and the subnet broadcast IP address prefix. << we want this
-                // In addition, for each adapter there is a
-                // 3. multicast address prefix
-                // 4. and a broadcast address prefix.sb
-                //
-                // We only care for AF_INET entry with index 2.
-                let mut current_prefix_address = unsafe { (*adapter_address).FirstPrefix };
-                let mut prefix_index_ipv4 = 0;
-                let mut bc_addr_ipv4 = None;
-                while !current_prefix_address.is_null() {
-                    let address = unsafe { (*current_prefix_address).Address };
-                    if unsafe { (*address.lpSockaddr).sa_family } == AF_INET {
-                        // only consider broadcast for IPv4
-                        if prefix_index_ipv4 == 2 {
-                            // 3rd IPv4 entry is broadcast address
-                            let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
-                            bc_addr_ipv4 = Some(make_ipv4_addr(&sockaddr)?);
-                            break;
-                        }
-                        prefix_index_ipv4 += 1; // only increase for AF_INET
-                    }
-                    current_prefix_address = unsafe { (*current_prefix_address).Next };
-                }
-
                 // see https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses#examples
                 let mac_addr_len = unsafe { (*adapter_address).PhysicalAddressLength } as _;
                 let mac_addr = match mac_addr_len {
@@ -154,13 +122,13 @@ impl NetworkInterfaceConfig for NetworkInterface {
                     match unsafe { (*address.lpSockaddr).sa_family } {
                         AF_INET => {
                             let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
-                            let addr = make_ipv4_addr(&sockaddr)?;
+                            let addr = make_ipv4_addr(&sockaddr);
                             let netmask = make_ipv4_netmask(&current_unicast_address);
                             let network_interface = NetworkInterface::new_afinet(
                                 &address_name,
                                 addr,
                                 netmask,
-                                bc_addr_ipv4,
+                                lookup_ipv4_broadcast_addr(&adapter_address, &sockaddr),
                                 index,
                             )
                             .with_mac_addr(mac_addr.clone());
@@ -201,6 +169,56 @@ impl NetworkInterfaceConfig for NetworkInterface {
     }
 }
 
+// Find broadcast address
+//
+// see https://docs.microsoft.com/en-us/windows/win32/api/iptypes/ns-iptypes-ip_adapter_addresses_lh
+//
+// On Windows Vista and later, the linked IP_ADAPTER_PREFIX structures pointed
+// to by the FirstPrefix member include three IP adapter prefixes for each IPv4
+// address assigned to the adapter. These include
+// 0. the host IP address prefix
+// 1. the subnet IP address prefix
+// 2. and the subnet broadcast IP address prefix. << we want these
+// In addition, for each adapter with n IP adresses there are (not used)
+// 3*n + 0. multicast address prefix
+// 3*n + 1. and a broadcast address prefix.sb
+//
+// The order of addresses in prefix list and unicast list is not guaranteed to
+// be the same, so we search for the unicast address in the prefix list, and
+// then the broadcast address is next in list.
+fn lookup_ipv4_broadcast_addr(
+    adapter_address: &*mut IP_ADAPTER_ADDRESSES_LH,
+    unicast_ip: &*mut SOCKADDR_IN,
+) -> Option<Ipv4Addr> {
+    let mut prefix_address = unsafe { (*(*adapter_address)).FirstPrefix };
+    let mut prefix_index_v4 = 0;
+    let mut broadcast_index: Option<i32> = None;
+
+    // Find adapter
+    while !prefix_address.is_null() {
+        let address = unsafe { (*prefix_address).Address };
+
+        if unsafe { (*address.lpSockaddr).sa_family } == AF_INET {
+            if let Some(broadcast_index) = broadcast_index {
+                if prefix_index_v4 == broadcast_index {
+                    let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
+                    return Some(make_ipv4_addr(&sockaddr));
+                }
+            } else {
+                if prefix_index_v4 % 3 == 1
+                    && ipv4_addr_equal(&(address.lpSockaddr as *mut SOCKADDR_IN), unicast_ip)
+                {
+                    broadcast_index = Some(prefix_index_v4 + 1);
+                }
+            }
+            prefix_index_v4 += 1;
+        }
+
+        prefix_address = unsafe { (*prefix_address).Next };
+    }
+    None
+}
+
 /// Retrieves the network interface name
 fn make_adapter_address_name(adapter_address: &*mut AdapterAddress) -> Result<String> {
     let address_name = unsafe { (*(*adapter_address)).FriendlyName };
@@ -220,7 +238,7 @@ fn make_ipv6_addr(sockaddr: &*mut SOCKADDR_IN6) -> Result<Ipv6Addr> {
 }
 
 /// Creates a `Ipv4Addr` from a `SOCKADDR_IN`
-fn make_ipv4_addr(sockaddr: &*mut SOCKADDR_IN) -> Result<Ipv4Addr> {
+fn make_ipv4_addr(sockaddr: &*mut SOCKADDR_IN) -> Ipv4Addr {
     let address = unsafe { (*(*sockaddr)).sin_addr.S_un.S_addr() };
 
     if cfg!(target_endian = "little") {
@@ -229,10 +247,17 @@ fn make_ipv4_addr(sockaddr: &*mut SOCKADDR_IN) -> Result<Ipv4Addr> {
         // on CPU endianess to avoid having twisted IP addresses
         //
         // refer: https://github.com/rust-lang/rust/issues/48819
-        return Ok(Ipv4Addr::from(address.swap_bytes()));
+        return Ipv4Addr::from(address.swap_bytes());
     }
 
-    Ok(Ipv4Addr::from(*address))
+    Ipv4Addr::from(*address)
+}
+
+/// Compare 2 ipv4 addresses. Caller must ensure pointers are non-null.
+fn ipv4_addr_equal(sockaddr1: &*mut SOCKADDR_IN, sockaddr2: &*mut SOCKADDR_IN) -> bool {
+    let address1 = unsafe { (*(*sockaddr1)).sin_addr.S_un.S_addr() };
+    let address2 = unsafe { (*(*sockaddr2)).sin_addr.S_un.S_addr() };
+    address1 == address2
 }
 
 /// This function relies on the `GetAdapterAddresses` API which is available only on Windows Vista
@@ -282,7 +307,7 @@ fn get_adapter_address_index(adapter_address: &*mut AdapterAddress) -> Result<u3
 mod tests {
     use std::{process::Command, cmp::min};
 
-    use crate::{NetworkInterface, NetworkInterfaceConfig};
+    use crate::{NetworkInterface, NetworkInterfaceConfig, Addr};
 
     #[test]
     fn test_mac_addr() {
@@ -308,6 +333,30 @@ mod tests {
             assert!(interfaces
                 .iter()
                 .any(|int| int.mac_addr.as_ref() == Some(&mac_addr)));
+        }
+    }
+
+    #[test]
+    // Check IP address consistency.
+    fn test_ipv4_broadcast() {
+        let interfaces = NetworkInterface::show().unwrap();
+        for ipv4 in interfaces.iter().flat_map(|i| &i.addr).filter_map(|addr| {
+            if let Addr::V4(ipv4) = addr {
+                Some(ipv4)
+            } else {
+                None
+            }
+        }) {
+            let Some(bc_addr) = ipv4.broadcast else {
+                continue;
+            };
+            let ip_bytes = ipv4.ip.octets();
+            let mask_bytes = ipv4.netmask.unwrap().octets();
+            let bc_bytes = bc_addr.octets();
+            for i in 0..4 {
+                assert_eq!(ip_bytes[i] & mask_bytes[i], bc_bytes[i] & mask_bytes[i]);
+                assert_eq!(bc_bytes[i] | mask_bytes[i], 255);
+            }
         }
     }
 }
