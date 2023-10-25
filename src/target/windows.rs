@@ -204,12 +204,10 @@ fn lookup_ipv4_broadcast_addr(
                     let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
                     return Some(make_ipv4_addr(&sockaddr));
                 }
-            } else {
-                if prefix_index_v4 % 3 == 1
-                    && ipv4_addr_equal(&(address.lpSockaddr as *mut SOCKADDR_IN), unicast_ip)
-                {
-                    broadcast_index = Some(prefix_index_v4 + 1);
-                }
+            } else if prefix_index_v4 % 3 == 1
+                && ipv4_addr_equal(&(address.lpSockaddr as *mut SOCKADDR_IN), unicast_ip)
+            {
+                broadcast_index = Some(prefix_index_v4 + 1);
             }
             prefix_index_v4 += 1;
         }
@@ -326,7 +324,7 @@ mod tests {
                 }
             })
             .collect();
-        assert!(mac_addr_list.len() > 0);
+        assert!(!mac_addr_list.is_empty());
 
         let interfaces = NetworkInterface::show().unwrap();
         for mac_addr in mac_addr_list {
