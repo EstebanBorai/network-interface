@@ -11,7 +11,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 pub type Netmask<T> = Option<T>;
 
 /// A system's network interface
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct NetworkInterface {
     /// Interface's name
@@ -25,7 +25,7 @@ pub struct NetworkInterface {
 }
 
 /// Network interface address
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Addr {
     /// IPV4 Interface from the AFINET network interface family
@@ -35,7 +35,7 @@ pub enum Addr {
 }
 
 /// IPV4 Interface from the AFINET network interface family
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct V4IfAddr {
     /// The IP address for this network interface
@@ -47,7 +47,7 @@ pub struct V4IfAddr {
 }
 
 /// IPV6 Interface from the AFINET6 network interface family
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct V6IfAddr {
     /// The IP address for this network interface
