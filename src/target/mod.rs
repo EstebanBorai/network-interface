@@ -4,11 +4,25 @@ mod linux;
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub use linux::*;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-mod apple;
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "dragonfly"
+))]
+mod unix;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-pub use apple::*;
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd",
+    target_os = "dragonfly"
+))]
+pub use unix::*;
 
 #[cfg(target_os = "windows")]
 mod windows;
