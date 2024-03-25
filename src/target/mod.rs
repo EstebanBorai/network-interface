@@ -1,6 +1,8 @@
+#[allow(unused_imports)]
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod linux;
 
+#[allow(unused_imports)]
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub use linux::*;
 

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::slice::from_raw_parts;
 
