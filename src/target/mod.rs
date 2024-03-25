@@ -26,9 +26,11 @@ mod unix;
 ))]
 pub use unix::*;
 
+#[allow(unused_imports)]
 #[cfg(target_os = "windows")]
 mod windows;
 
+#[allow(unused_imports)]
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
 
