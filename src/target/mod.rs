@@ -1,6 +1,8 @@
+#[allow(unused_imports)]
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod linux;
 
+#[allow(unused_imports)]
 #[cfg(any(target_os = "android", target_os = "linux"))]
 pub use linux::*;
 
@@ -24,9 +26,11 @@ mod unix;
 ))]
 pub use unix::*;
 
+#[allow(unused_imports)]
 #[cfg(target_os = "windows")]
 mod windows;
 
+#[allow(unused_imports)]
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
 
