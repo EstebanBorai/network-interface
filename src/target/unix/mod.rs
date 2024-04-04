@@ -72,7 +72,7 @@ impl NetworkInterfaceConfig for NetworkInterface {
 /// Retrieves the network interface name
 fn make_netifa_name(netifa: &libc::ifaddrs) -> Result<String> {
     let data = netifa.ifa_name as *mut u8;
-    let len = unsafe { strlen(data as *const i8) };
+    let len = unsafe { strlen(data as *const _) };
     let bytes_slice = unsafe { from_raw_parts(data, len) };
     let string = String::from_utf8(bytes_slice.to_vec()).map_err(Error::from)?;
 
