@@ -13,6 +13,7 @@ use winapi::{
         netioapi::{ConvertLengthToIpv4Mask, ConvertInterfaceLuidToIndex},
         ntdef::ULONG,
         ifdef::IF_LUID,
+        winerror,
     },
     um::{
         iptypes::{IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_UNICAST_ADDRESS_LH},
@@ -21,25 +22,12 @@ use winapi::{
 };
 
 use crate::utils::hex::HexSlice;
+use crate::utils::ffialloc::FFIAlloc;
 use crate::{Error, NetworkInterface, NetworkInterfaceConfig, Result};
 use crate::interface::Netmask;
 
 /// An alias for `IP_ADAPTER_ADDRESSES_LH`
 type AdapterAddress = IP_ADAPTER_ADDRESSES_LH;
-
-/// The buffer size indicated by the `SizePointer` parameter is too small to hold the
-/// adapter information or the `AdapterAddresses` parameter is `NULL`. The `SizePointer`
-/// parameter returned points to the required size of the buffer to hold the adapter
-/// information.
-///
-/// Source: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses#return-value
-const ERROR_BUFFER_OVERFLOW: u32 = 111;
-
-/// Max tries allowed to call `GetAdaptersAddresses` on a loop basis
-const MAX_TRIES: usize = 3;
-
-/// Success execution output from `GetAdaptersAddresses` call
-const GET_ADAPTERS_ADDRESSES_SUCCESS_RESULT: u32 = 0;
 
 /// A constant to store `winapi::shared::ws2def::AF_INET` casted as `u16`
 const AF_INET: u16 = winapi::shared::ws2def::AF_INET as u16;
@@ -59,111 +47,119 @@ const GET_ADAPTERS_ADDRESSES_FLAGS: ULONG = winapi::um::iptypes::GAA_FLAG_INCLUD
 impl NetworkInterfaceConfig for NetworkInterface {
     fn show() -> Result<Vec<NetworkInterface>> {
         // Allocate a 15 KB buffer to start with.
-        let mut size_pointer: u32 = 15000;
-        let mut adapter_address = unsafe { malloc(size_pointer as usize) as *mut AdapterAddress };
-        let mut iterations = 0;
-        let mut get_adapter_addresses_result = 0;
-        let mut network_interfaces: Vec<NetworkInterface> = Vec::new();
+        let mut buffer_size: u32 = 15000;
+        // Limit retries
+        const MAX_TRIES: i32 = 10;
+        let mut try_no = 1;
 
-        while get_adapter_addresses_result != ERROR_BUFFER_OVERFLOW || iterations <= MAX_TRIES {
-            adapter_address = unsafe { malloc(size_pointer as usize) as *mut AdapterAddress };
-
-            if adapter_address.is_null() {
+        let adapter_address = loop {
+            let adapter_address = FFIAlloc::alloc(buffer_size as usize).ok_or_else(|| {
                 // Memory allocation failed for IP_ADAPTER_ADDRESSES struct
-                return Err(Error::GetIfAddrsError(
-                    String::from("GetAdaptersAddresses"),
-                    1,
-                ));
-            }
+                Error::GetIfAddrsError(String::from("GetAdaptersAddresses"), 1)
+            })?;
 
-            get_adapter_addresses_result = unsafe {
+            let res = unsafe {
                 GetAdaptersAddresses(
                     GET_ADAPTERS_ADDRESSES_FAMILY,
                     GET_ADAPTERS_ADDRESSES_FLAGS,
                     null_mut(),
-                    adapter_address,
-                    &mut size_pointer,
+                    adapter_address.as_mut_ptr(),
+                    &mut buffer_size,
                 )
             };
-
-            if get_adapter_addresses_result == ERROR_BUFFER_OVERFLOW {
-                unsafe {
-                    free(adapter_address as *mut c_void);
-                };
-                adapter_address = null_mut();
-            } else {
-                break;
-            }
-
-            iterations += 1;
-        }
-
-        if get_adapter_addresses_result == GET_ADAPTERS_ADDRESSES_SUCCESS_RESULT {
-            while !adapter_address.is_null() {
-                let address_name = make_adapter_address_name(&adapter_address)?;
-
-                let index = get_adapter_address_index(&adapter_address)?;
-
-                // see https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses#examples
-                let mac_addr_len = unsafe { (*adapter_address).PhysicalAddressLength } as _;
-                let mac_addr = match mac_addr_len {
-                    0 => None,
-                    len => Some(format!(
-                        "{}",
-                        HexSlice::new(unsafe { &(*adapter_address).PhysicalAddress[..len] })
-                    )),
-                };
-
-                // Find interface addresses
-                let mut current_unicast_address = unsafe { (*adapter_address).FirstUnicastAddress };
-
-                while !current_unicast_address.is_null() {
-                    let address = unsafe { (*current_unicast_address).Address };
-
-                    match unsafe { (*address.lpSockaddr).sa_family } {
-                        AF_INET => {
-                            let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
-                            let addr = make_ipv4_addr(&sockaddr);
-                            let netmask = make_ipv4_netmask(&current_unicast_address);
-                            let network_interface = NetworkInterface::new_afinet(
-                                &address_name,
-                                addr,
-                                netmask,
-                                lookup_ipv4_broadcast_addr(&adapter_address, &sockaddr),
-                                index,
-                            )
-                            .with_mac_addr(mac_addr.clone());
-
-                            network_interfaces.push(network_interface);
-                        }
-                        AF_INET6 => {
-                            let sockaddr: *mut SOCKADDR_IN6 =
-                                address.lpSockaddr as *mut SOCKADDR_IN6;
-                            let addr = make_ipv6_addr(&sockaddr)?;
-                            let netmask = make_ipv6_netmask(&sockaddr);
-                            let network_interface = NetworkInterface::new_afinet6(
-                                &address_name,
-                                addr,
-                                netmask,
-                                None,
-                                index,
-                            )
-                            .with_mac_addr(mac_addr.clone());
-
-                            network_interfaces.push(network_interface);
-                        }
-                        _ => {}
-                    }
-
-                    if !current_unicast_address.is_null() {
-                        current_unicast_address = unsafe { (*current_unicast_address).Next };
-                    }
+            match res {
+                winerror::ERROR_SUCCESS => {
+                    break Ok(adapter_address);
                 }
-
-                if !adapter_address.is_null() {
-                    adapter_address = unsafe { (*adapter_address).Next };
+                winerror::ERROR_BUFFER_OVERFLOW => {
+                    // The buffer size indicated by the `SizePointer` parameter is too small to hold the
+                    // adapter information or the `AdapterAddresses` parameter is `NULL`. The `SizePointer`
+                    // parameter returned points to the required size of the buffer to hold the adapter
+                    // information.
+                    //
+                    // Source: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses#return-value
+                    if try_no == MAX_TRIES {
+                        break Err(Error::GetIfAddrsError(
+                            "GetAdapterAddresses: alloc error".to_string(),
+                            res as i32,
+                        ));
+                    }
+                    try_no += 1;
+                }
+                _ => {
+                    break Err(Error::GetIfAddrsError(
+                        "GetAdapterAddresses".to_string(),
+                        res as i32,
+                    ));
                 }
             }
+        }?;
+
+        // iterate over the contained structs
+        let mut adapter_address_it = adapter_address.as_ptr();
+        let mut network_interfaces: Vec<NetworkInterface> = Vec::new();
+
+        while !adapter_address_it.is_null() {
+            let address_name = make_adapter_address_name(adapter_address_it)?;
+
+            let index = get_adapter_address_index(adapter_address_it)?;
+
+            // see https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses#examples
+            let mac_addr_len = unsafe { (*adapter_address_it).PhysicalAddressLength } as _;
+            let mac_addr = match mac_addr_len {
+                0 => None,
+                len => Some(format!(
+                    "{}",
+                    HexSlice::new(unsafe { &(*adapter_address_it).PhysicalAddress[..len] })
+                )),
+            };
+
+            // Find interface addresses
+            let mut current_unicast_address = unsafe { (*adapter_address_it).FirstUnicastAddress };
+
+            while !current_unicast_address.is_null() {
+                let address = unsafe { (*current_unicast_address).Address };
+
+                match unsafe { (*address.lpSockaddr).sa_family } {
+                    AF_INET => {
+                        let sockaddr: *mut SOCKADDR_IN = address.lpSockaddr as *mut SOCKADDR_IN;
+                        let addr = make_ipv4_addr(&sockaddr);
+                        let netmask = make_ipv4_netmask(&current_unicast_address);
+                        let network_interface = NetworkInterface::new_afinet(
+                            &address_name,
+                            addr,
+                            netmask,
+                            lookup_ipv4_broadcast_addr(adapter_address_it, &sockaddr),
+                            index,
+                        )
+                        .with_mac_addr(mac_addr.clone());
+
+                        network_interfaces.push(network_interface);
+                    }
+                    AF_INET6 => {
+                        let sockaddr: *mut SOCKADDR_IN6 = address.lpSockaddr as *mut SOCKADDR_IN6;
+                        let addr = make_ipv6_addr(&sockaddr)?;
+                        let netmask = make_ipv6_netmask(&sockaddr);
+                        let network_interface = NetworkInterface::new_afinet6(
+                            &address_name,
+                            addr,
+                            netmask,
+                            None,
+                            index,
+                        )
+                        .with_mac_addr(mac_addr.clone());
+
+                        network_interfaces.push(network_interface);
+                    }
+                    _ => {}
+                }
+
+                if !current_unicast_address.is_null() {
+                    current_unicast_address = unsafe { (*current_unicast_address).Next };
+                }
+            }
+
+            adapter_address_it = unsafe { (*adapter_address_it).Next };
         }
 
         Ok(network_interfaces)
@@ -188,10 +184,10 @@ impl NetworkInterfaceConfig for NetworkInterface {
 // be the same, so we search for the unicast address in the prefix list, and
 // then the broadcast address is next in list.
 fn lookup_ipv4_broadcast_addr(
-    adapter_address: &*mut IP_ADAPTER_ADDRESSES_LH,
+    adapter_address: *const IP_ADAPTER_ADDRESSES_LH,
     unicast_ip: &*mut SOCKADDR_IN,
 ) -> Option<Ipv4Addr> {
-    let mut prefix_address = unsafe { (*(*adapter_address)).FirstPrefix };
+    let mut prefix_address = unsafe { (*adapter_address).FirstPrefix };
     let mut prefix_index_v4 = 0;
     let mut broadcast_index: Option<i32> = None;
 
@@ -219,8 +215,8 @@ fn lookup_ipv4_broadcast_addr(
 }
 
 /// Retrieves the network interface name
-fn make_adapter_address_name(adapter_address: &*mut AdapterAddress) -> Result<String> {
-    let address_name = unsafe { (*(*adapter_address)).FriendlyName };
+fn make_adapter_address_name(adapter_address: *const AdapterAddress) -> Result<String> {
+    let address_name = unsafe { (*adapter_address).FriendlyName };
     let address_name_length = unsafe { wcslen(address_name as *const wchar_t) };
     let byte_slice = unsafe { from_raw_parts(address_name, address_name_length) };
     let string = String::from_utf16(byte_slice).map_err(Error::from)?;
@@ -287,8 +283,8 @@ fn make_ipv6_netmask(_sockaddr: &*mut SOCKADDR_IN6) -> Netmask<Ipv6Addr> {
     None
 }
 
-fn get_adapter_address_index(adapter_address: &*mut AdapterAddress) -> Result<u32> {
-    let adapter_luid = &unsafe { (*(*adapter_address)).Luid } as *const IF_LUID;
+fn get_adapter_address_index(adapter_address: *const AdapterAddress) -> Result<u32> {
+    let adapter_luid = &unsafe { (*adapter_address).Luid } as *const IF_LUID;
 
     let index = &mut 0u32 as *mut u32;
 
