@@ -47,3 +47,6 @@ Thumbs.db
 # Ignores `Cargo.lock` as recommended here:
 # https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html#cargotoml-vs-cargolock
 Cargo.lock
+
+# JB Rust Rover #
+/.idea
