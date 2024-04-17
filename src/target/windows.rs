@@ -264,12 +264,10 @@ fn ipv4_addr_equal(sockaddr1: &*mut SOCKADDR_IN, sockaddr2: &*mut SOCKADDR_IN) -
 /// An implementation of `GetIpAddrTable` to get all available network interfaces would be required
 /// in order to support previous versions of Windows.
 fn make_ipv4_netmask(unicast_address: &*mut IP_ADAPTER_UNICAST_ADDRESS_LH) -> Netmask<Ipv4Addr> {
-    let mask = unsafe { malloc(size_of::<u32>()) as *mut u32 };
+    let mut mask = 0u32;
     let on_link_prefix_length = unsafe { (*(*unicast_address)).OnLinkPrefixLength };
 
-    unsafe { ConvertLengthToIpv4Mask(on_link_prefix_length as u32, mask) };
-
-    let mask = unsafe { *mask };
+    unsafe { ConvertLengthToIpv4Mask(on_link_prefix_length as u32, & mut mask) };
 
     if cfg!(target_endian = "little") {
         // due to a difference on how bytes are arranged on a
