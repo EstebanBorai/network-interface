@@ -13,6 +13,9 @@ pub mod hex;
 ))]
 mod unix;
 
+#[cfg(windows)]
+pub(crate) mod ffialloc;
+
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
