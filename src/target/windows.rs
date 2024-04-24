@@ -29,7 +29,7 @@ use crate::utils::ffialloc::FFIAlloc;
 use crate::{Addr, Error, NetworkInterface, NetworkInterfaceConfig, Result, V4IfAddr, V6IfAddr};
 use crate::interface::Netmask;
 
-/// An alias for `IP_ADAPTER_ADDRESSES_LH`
+/// An alias for `IP_ADAPTER_ADDRESSES`
 type AdapterAddress = IP_ADAPTER_ADDRESSES;
 
 /// A constant to store `winapi::shared::ws2def::AF_INET` casted as `u16`
@@ -48,6 +48,7 @@ const GET_ADAPTERS_ADDRESSES_FAMILY: u32 = AF_UNSPEC as u32;
 const GET_ADAPTERS_ADDRESSES_FLAGS: ULONG = winapi::um::iptypes::GAA_FLAG_INCLUDE_PREFIX;
 
 type MacAddress = Option<String>;
+
 macro_rules! iterable_raw_pointer {
     ($t: ty, $n: ident) => {
         impl IterableRawPointer for $t {
